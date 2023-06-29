@@ -1,6 +1,8 @@
 # OCI Registry Java Library
 
-[![GitHub](https://img.shields.io/github/license/sgtsilvio/gradle-metadata?color=brightgreen&style=for-the-badge)](LICENSE)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.github.sgtsilvio/oci-registry/badge.svg?style=for-the-badge)](https://maven-badges.herokuapp.com/maven-central/io.github.sgtsilvio/oci-registry)
+[![javadoc](https://javadoc.io/badge2/io.github.sgtsilvio/oci-registry/javadoc.svg?style=for-the-badge)](https://javadoc.io/doc/io.github.sgtsilvio/oci-registry)
+[![GitHub](https://img.shields.io/github/license/sgtsilvio/oci-registry?color=brightgreen&style=for-the-badge)](LICENSE)
 
 OCI registry Java library that allows serving OCI artifacts to pull operations.
 
