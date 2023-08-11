@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.metadata)
     `maven-publish`
     signing
-    alias(libs.plugins.nexus.publish)
+    alias(libs.plugins.nexusPublish)
 }
 
 group = "io.github.sgtsilvio"
