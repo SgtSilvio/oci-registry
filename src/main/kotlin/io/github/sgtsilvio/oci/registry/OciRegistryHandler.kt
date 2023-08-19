@@ -1,5 +1,7 @@
 package io.github.sgtsilvio.oci.registry
 
+import io.netty.handler.codec.http.HttpHeaderNames
+import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpMethod.*
 import org.json.JSONObject
 import org.reactivestreams.Publisher
@@ -95,8 +97,8 @@ class OciRegistryHandler(private val directory: Path) :
             return response.sendNotFound()
         }
         val data = Files.readAllBytes(dataFile)
-        response.header("Content-Type", JSONObject(data.decodeToString()).getString("mediaType"))
-        response.header("Content-Length", data.size.toString())
+        response.header(HttpHeaderNames.CONTENT_TYPE, JSONObject(data.decodeToString()).getString("mediaType"))
+        response.header(HttpHeaderNames.CONTENT_LENGTH, data.size.toString())
         return if (isGET) response.sendByteArray(Mono.just(data)) else response.send()
     }
 
@@ -110,8 +112,8 @@ class OciRegistryHandler(private val directory: Path) :
         if (!Files.exists(dataFile)) {
             return response.sendNotFound()
         }
-        response.header("Content-Type", "application/octet-stream")
-        response.header("Content-Length", Files.size(dataFile).toString())
+        response.header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM)
+        response.header(HttpHeaderNames.CONTENT_LENGTH, Files.size(dataFile).toString())
         return if (isGET) response.sendFile(dataFile) else response.send()
     }
 
