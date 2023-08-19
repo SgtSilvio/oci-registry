@@ -34,7 +34,7 @@ class OciRegistryHandler(private val directory: Path) :
         }
 
         (segments.size == 1) && (segments[0] == "_catalog") -> when (request.method()) {
-            GET -> response.status(403).send()
+            GET -> response.status(405).send()
             else -> response.status(405).send()
         }
 
@@ -43,7 +43,7 @@ class OciRegistryHandler(private val directory: Path) :
         else -> when (segments[segments.lastIndex - 1]) {
             "tags" -> if (segments[segments.lastIndex] == "list") {
                 when (request.method()) {
-                    GET -> response.status(403).send()
+                    GET -> response.status(405).send()
                     else -> response.status(405).send()
                 }
             } else response.sendNotFound()
@@ -51,19 +51,19 @@ class OciRegistryHandler(private val directory: Path) :
             "manifests" -> when (request.method()) {
                 GET -> getOrHeadManifest(segments, true, response)
                 HEAD -> getOrHeadManifest(segments, false, response)
-                PUT, DELETE -> response.status(403).send()
+                PUT, DELETE -> response.status(405).send()
                 else -> response.status(405).send()
             }
 
             "blobs" -> when (request.method()) {
                 GET -> getOrHeadBlob(segments, true, response)
                 HEAD -> getOrHeadBlob(segments, false, response)
-                DELETE -> response.status(403).send()
+                DELETE -> response.status(405).send()
                 else -> response.status(405).send()
             }
 
             "uploads" -> when (request.method()) {
-                POST, GET, PATCH, PUT, DELETE -> response.status(403).send()
+                POST, GET, PATCH, PUT, DELETE -> response.status(405).send()
                 else -> response.status(405).send()
             }
 
