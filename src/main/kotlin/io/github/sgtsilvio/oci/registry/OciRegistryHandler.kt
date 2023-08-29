@@ -12,6 +12,36 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.function.BiFunction
 
+/*
+https://github.com/opencontainers/distribution-spec/blob/main/spec.md
+https://docs.docker.com/registry/spec/api/
+
+end-1   GET	    /v2/                                                        200     ✔
+end-2   GET	    /v2/<name>/blobs/<digest>                                   200/404 ✔
+end-2   HEAD    /v2/<name>/blobs/<digest>                                   200/404 ✔
+end-10  DELETE  /v2/<name>/blobs/<digest>                                   405     ✔
+end-3   GET	    /v2/<name>/manifests/<reference>                            200/404 ✔
+end-3   HEAD    /v2/<name>/manifests/<reference>                            200/404 ✔
+end-7   PUT     /v2/<name>/manifests/<reference>                            405     ✔
+end-9   DELETE  /v2/<name>/manifests/<reference>                            405     ✔
+end-4a  POST    /v2/<name>/blobs/uploads/                                   405     ✔
+end-4b  POST    /v2/<name>/blobs/uploads/?digest=<digest>                   405     ✔
+end-11  POST    /v2/<name>/blobs/uploads/?mount=<digest>&from=<other_name>  405     ✔
+end-13  GET     /v2/<name>/blobs/uploads/<reference>                        405     ✔
+end-5   PATCH   /v2/<name>/blobs/uploads/<reference>                        405     ✔
+        DELETE  /v2/<name>/blobs/uploads/<reference>                        405     ✔
+end-6   PUT     /v2/<name>/blobs/uploads/<reference>?digest=<digest>        405     ✔
+end-8a  GET     /v2/<name>/tags/list                                        405     ✔
+end-8b  GET     /v2/<name>/tags/list?n=<integer>&last=<tag name>            405     ✔
+end-12a GET     /v2/<name>/referrers/<digest>
+end-12b GET     /v2/<name>/referrers/<digest>?artifactType=<artifactType>
+        GET     /v2/_catalog                                                405     ✔
+        GET     /v2/_catalog?n=<integer>&last=<repository name>             405     ✔
+ */
+
+/**
+ * @author Silvio Giebl
+ */
 class OciRegistryHandler(private val directory: Path) :
     BiFunction<HttpServerRequest, HttpServerResponse, Publisher<Void>> {
 
