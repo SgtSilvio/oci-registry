@@ -12,24 +12,24 @@ group = "io.github.sgtsilvio"
 description = "OCI registry Java library that allows serving OCI artifacts to pull operations"
 
 metadata {
-    readableName.set("OCI Registry Java Library")
+    readableName = "OCI Registry Java Library"
     license {
         apache2()
     }
     developers {
         register("SgtSilvio") {
-            fullName.set("Silvio Giebl")
+            fullName = "Silvio Giebl"
         }
     }
     github {
-        org.set("SgtSilvio")
+        org = "SgtSilvio"
         issues()
     }
 }
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(8))
+        languageVersion = JavaLanguageVersion.of(8)
     }
     withJavadocJar()
     withSourcesJar()
@@ -62,8 +62,8 @@ signing {
 nexusPublishing {
     this.repositories {
         sonatype {
-            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+            nexusUrl = uri("https://s01.oss.sonatype.org/service/local/")
+            snapshotRepositoryUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         }
     }
 }
