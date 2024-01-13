@@ -46,7 +46,7 @@ class OciRegistryHandler(private val directory: Path) :
     BiFunction<HttpServerRequest, HttpServerResponse, Publisher<Void>> {
 
     override fun apply(request: HttpServerRequest, response: HttpServerResponse): Publisher<Void> {
-        val segments = request.uri().substring(1).split('/')
+        val segments = request.fullPath().substring(1).split('/')
         return when {
             segments[0] == "v2" -> handleV2(request, segments.drop(1), response)
             else -> response.sendNotFound()
