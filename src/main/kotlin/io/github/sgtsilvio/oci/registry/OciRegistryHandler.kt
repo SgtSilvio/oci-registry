@@ -8,9 +8,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import reactor.netty.http.server.HttpServerRequest
 import reactor.netty.http.server.HttpServerResponse
-import java.nio.file.Path
 import java.util.function.BiFunction
-import kotlin.io.path.exists
 import kotlin.io.path.fileSize
 import kotlin.io.path.readBytes
 
@@ -44,7 +42,7 @@ end-12b GET     /v2/<name>/referrers/<digest>?artifactType=<artifactType>
 /**
  * @author Silvio Giebl
  */
-class OciRegistryHandler(private val directory: Path) :
+class OciRegistryHandler(private val storage: OciRegistryStorage) :
     BiFunction<HttpServerRequest, HttpServerResponse, Publisher<Void>> {
 
     override fun apply(request: HttpServerRequest, response: HttpServerResponse): Publisher<Void> {
@@ -110,50 +108,25 @@ class OciRegistryHandler(private val directory: Path) :
     ): Publisher<Void> {
         val name = decodeName(segments, segments.lastIndex - 1)
         val reference = segments[segments.lastIndex]
-        val manifestsDirectory = resolveRepositoryDirectory(name).resolve("_manifests")
-        val linkFile = if (':' in reference) {
-            manifestsDirectory.resolve("revisions").resolveLinkFile(reference.toOciDigest())
+        val manifestFile = if (':' in reference) {
+            storage.getManifest(name, reference.toOciDigest())
         } else {
-            manifestsDirectory.resolve("tags").resolve(reference).resolve("current/link")
-        }
-        if (!linkFile.exists()) {
-            return response.sendNotFound()
-        }
-        val digest = linkFile.readBytes().decodeToString().toOciDigest()
-        val dataFile = resolveBlobFile(digest)
-        if (!dataFile.exists()) {
-            return response.sendNotFound()
-        }
-        val data = dataFile.readBytes()
-        response.header(HttpHeaderNames.CONTENT_TYPE, JSONObject(data.decodeToString()).getString("mediaType"))
-        response.header(HttpHeaderNames.CONTENT_LENGTH, data.size.toString())
-        return if (isGET) response.sendByteArray(Mono.just(data)) else response.send()
+            storage.getManifest(name, reference)
+        } ?: return response.sendNotFound()
+        val manifestBytes = manifestFile.readBytes()
+        response.header(HttpHeaderNames.CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
+        response.header(HttpHeaderNames.CONTENT_LENGTH, manifestBytes.size.toString())
+        return if (isGET) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
     }
 
     private fun getOrHeadBlob(segments: List<String>, isGET: Boolean, response: HttpServerResponse): Publisher<Void> {
         val name = decodeName(segments, segments.lastIndex - 1)
         val digest = segments[segments.lastIndex].toOciDigest()
-        val linkFile = resolveRepositoryDirectory(name).resolve("_layers").resolveLinkFile(digest)
-        if (!linkFile.exists()) {
-            return response.sendNotFound()
-        }
-        val actualDigest = linkFile.readBytes().decodeToString().toOciDigest()
-        val dataFile = resolveBlobFile(actualDigest)
-        if (!dataFile.exists()) {
-            return response.sendNotFound()
-        }
+        val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
         response.header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM)
-        response.header(HttpHeaderNames.CONTENT_LENGTH, dataFile.fileSize().toString())
-        return if (isGET) response.sendFile(dataFile) else response.send()
+        response.header(HttpHeaderNames.CONTENT_LENGTH, blobFile.fileSize().toString())
+        return if (isGET) response.sendFile(blobFile) else response.send()
     }
 
     private fun decodeName(segments: List<String>, toIndex: Int) = segments.subList(0, toIndex).joinToString("/")
-
-    private fun resolveRepositoryDirectory(name: String) = directory.resolve("repositories").resolve(name)
-
-    private fun Path.resolveLinkFile(digest: OciDigest) = resolve(digest.algorithm).resolve(digest.hash).resolve("link")
-
-    private fun resolveBlobFile(digest: OciDigest) =
-        directory.resolve("blobs").resolve(digest.algorithm).resolve(digest.hash.substring(0, 2)).resolve(digest.hash)
-            .resolve("data")
 }
