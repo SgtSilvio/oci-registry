@@ -8,9 +8,11 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import reactor.netty.http.server.HttpServerRequest
 import reactor.netty.http.server.HttpServerResponse
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.function.BiFunction
+import kotlin.io.path.exists
+import kotlin.io.path.fileSize
+import kotlin.io.path.readBytes
 
 /*
 https://github.com/opencontainers/distribution-spec/blob/main/spec.md
@@ -114,15 +116,15 @@ class OciRegistryHandler(private val directory: Path) :
         } else {
             manifestsDirectory.resolve("tags").resolve(reference).resolve("current/link")
         }
-        if (!Files.exists(linkFile)) {
+        if (!linkFile.exists()) {
             return response.sendNotFound()
         }
-        val digest = Files.readAllBytes(linkFile).decodeToString().toOciDigest()
+        val digest = linkFile.readBytes().decodeToString().toOciDigest()
         val dataFile = resolveBlobFile(digest)
-        if (!Files.exists(dataFile)) {
+        if (!dataFile.exists()) {
             return response.sendNotFound()
         }
-        val data = Files.readAllBytes(dataFile)
+        val data = dataFile.readBytes()
         response.header(HttpHeaderNames.CONTENT_TYPE, JSONObject(data.decodeToString()).getString("mediaType"))
         response.header(HttpHeaderNames.CONTENT_LENGTH, data.size.toString())
         return if (isGET) response.sendByteArray(Mono.just(data)) else response.send()
@@ -132,16 +134,16 @@ class OciRegistryHandler(private val directory: Path) :
         val name = decodeName(segments, segments.lastIndex - 1)
         val digest = segments[segments.lastIndex].toOciDigest()
         val linkFile = resolveRepositoryDirectory(name).resolve("_layers").resolveLinkFile(digest)
-        if (!Files.exists(linkFile)) {
+        if (!linkFile.exists()) {
             return response.sendNotFound()
         }
-        val actualDigest = Files.readAllBytes(linkFile).decodeToString().toOciDigest()
+        val actualDigest = linkFile.readBytes().decodeToString().toOciDigest()
         val dataFile = resolveBlobFile(actualDigest)
-        if (!Files.exists(dataFile)) {
+        if (!dataFile.exists()) {
             return response.sendNotFound()
         }
         response.header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM)
-        response.header(HttpHeaderNames.CONTENT_LENGTH, Files.size(dataFile).toString())
+        response.header(HttpHeaderNames.CONTENT_LENGTH, dataFile.fileSize().toString())
         return if (isGET) response.sendFile(dataFile) else response.send()
     }
 
