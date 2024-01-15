@@ -36,7 +36,7 @@ class DefaultOciRegistryStorage(private val directory: Path) : OciRegistryStorag
         return blobFile
     }
 
-    private fun resolveRepositoryDirectory(name: String) = directory.resolve("repositories").resolve(name)
+    private fun resolveRepositoryDirectory(name: String): Path = directory.resolve("repositories").resolve(name)
 
-    private fun Path.resolveDigestFile(digest: OciDigest) = resolve(digest.algorithm).resolve(digest.hash)
+    private fun Path.resolveDigestFile(digest: OciDigest): Path = resolve(digest.algorithm).resolve(digest.hash)
 }

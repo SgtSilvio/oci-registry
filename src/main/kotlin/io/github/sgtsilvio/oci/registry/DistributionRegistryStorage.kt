@@ -40,7 +40,8 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return blobFile
     }
 
-    private fun resolveRepositoryDirectory(name: String) = directory.resolve("repositories").resolve(name)
+    private fun resolveRepositoryDirectory(name: String): Path = directory.resolve("repositories").resolve(name)
 
-    private fun Path.resolveLinkFile(digest: OciDigest) = resolve(digest.algorithm).resolve(digest.hash).resolve("link")
+    private fun Path.resolveLinkFile(digest: OciDigest): Path =
+        resolve(digest.algorithm).resolve(digest.hash).resolve("link")
 }
