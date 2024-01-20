@@ -29,6 +29,6 @@ Add the following to your code (example in Kotlin):
 ```kotlin
 HttpServer.create()
     .port(1234)
-    .handle(OciRegistryHandler(Path.of("path/to/registry/data")))
+    .handle(OciRegistryHandler(DistributionRegistryStorage(Path.of("path/to/registry/data"))))
     .bindNow()
 ```
