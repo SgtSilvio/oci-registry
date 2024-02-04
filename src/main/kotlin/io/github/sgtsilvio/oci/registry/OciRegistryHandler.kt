@@ -92,10 +92,12 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
                 else -> response.status(405).send()
             }
 
-            "uploads" -> when (request.method()) {
-                POST, GET, PATCH, PUT, DELETE -> response.status(405).send()
-                else -> response.status(405).send()
-            }
+            "uploads" -> if (segments[segments.lastIndex - 2] == "blobs") {
+                when (request.method()) {
+                    POST, GET, PATCH, PUT, DELETE -> response.status(405).send()
+                    else -> response.status(405).send()
+                }
+            } else response.sendNotFound()
 
             else -> response.sendNotFound()
         }
