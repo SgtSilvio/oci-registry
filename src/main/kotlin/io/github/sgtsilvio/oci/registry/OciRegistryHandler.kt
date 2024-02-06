@@ -74,12 +74,14 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         val secondLastSegment = path.substring(secondLastSlashIndex + 1, lastSlashIndex)
         val lastSegment = path.substring(lastSlashIndex + 1)
         return when (secondLastSegment) {
-            "tags" -> if (lastSegment == "list") {
-                when (request.method()) {
+            "tags" -> when (lastSegment) {
+                "list" -> when (request.method()) {
                     GET -> response.status(405).send()
                     else -> response.status(405).send()
                 }
-            } else response.sendNotFound()
+
+                else -> response.sendNotFound()
+            }
 
             "manifests" -> when (request.method()) {
                 GET -> getOrHeadManifest(firstSegments, lastSegment, true, response)
@@ -95,12 +97,14 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
                 else -> response.status(405).send()
             }
 
-            "uploads" -> if (firstSegments.endsWith("/blobs")) {
-                when (request.method()) {
+            "uploads" -> when {
+                firstSegments.endsWith("/blobs") -> when (request.method()) {
                     POST, GET, PATCH, PUT, DELETE -> response.status(405).send()
                     else -> response.status(405).send()
                 }
-            } else response.sendNotFound()
+
+                else -> response.sendNotFound()
+            }
 
             else -> response.sendNotFound()
         }
