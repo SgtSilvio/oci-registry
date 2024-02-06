@@ -46,32 +46,35 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
     BiFunction<HttpServerRequest, HttpServerResponse, Publisher<Void>> {
 
     override fun apply(request: HttpServerRequest, response: HttpServerResponse): Publisher<Void> {
-        val segments = request.fullPath().substring(1).split('/')
-        return when {
-            segments[0] == "v2" -> handleV2(request, segments.drop(1), response)
+        val path = request.fullPath().substring(1)
+        return when (path.substringBefore('/')) {
+            "v2" -> handleV2(request, path.substring("v2".length), response)
             else -> response.sendNotFound()
         }
     }
 
-    private fun handleV2(
-        request: HttpServerRequest,
-        segments: List<String>,
-        response: HttpServerResponse,
-    ): Publisher<Void> = when {
-        segments.isEmpty() || segments[0].isEmpty() -> when (request.method()) {
-            GET, HEAD -> response.header("Docker-Distribution-API-Version", "registry/2.0").send()
-            else -> response.status(405).send()
+    private fun handleV2(request: HttpServerRequest, path: String, response: HttpServerResponse): Publisher<Void> {
+        when (path) {
+            "", "/" -> return when (request.method()) {
+                GET, HEAD -> response.header("Docker-Distribution-API-Version", "registry/2.0").send()
+                else -> response.status(405).send()
+            }
+
+            "/_catalog" -> return when (request.method()) {
+                GET -> response.status(405).send()
+                else -> response.status(405).send()
+            }
         }
-
-        (segments.size == 1) && (segments[0] == "_catalog") -> when (request.method()) {
-            GET -> response.status(405).send()
-            else -> response.status(405).send()
+        val lastSlashIndex = path.lastIndexOf('/')
+        val secondLastSlashIndex = path.lastIndexOf('/', lastSlashIndex - 1)
+        if (secondLastSlashIndex < 1) {
+            return response.sendNotFound()
         }
-
-        segments.size < 3 -> response.sendNotFound()
-
-        else -> when (segments[segments.lastIndex - 1]) {
-            "tags" -> if (segments[segments.lastIndex] == "list") {
+        val firstSegments = path.substring(1, secondLastSlashIndex)
+        val secondLastSegment = path.substring(secondLastSlashIndex + 1, lastSlashIndex)
+        val lastSegment = path.substring(lastSlashIndex + 1)
+        return when (secondLastSegment) {
+            "tags" -> if (lastSegment == "list") {
                 when (request.method()) {
                     GET -> response.status(405).send()
                     else -> response.status(405).send()
@@ -79,20 +82,20 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
             } else response.sendNotFound()
 
             "manifests" -> when (request.method()) {
-                GET -> getOrHeadManifest(segments, true, response)
-                HEAD -> getOrHeadManifest(segments, false, response)
+                GET -> getOrHeadManifest(firstSegments, lastSegment, true, response)
+                HEAD -> getOrHeadManifest(firstSegments, lastSegment, false, response)
                 PUT, DELETE -> response.status(405).send()
                 else -> response.status(405).send()
             }
 
             "blobs" -> when (request.method()) {
-                GET -> getOrHeadBlob(segments, true, response)
-                HEAD -> getOrHeadBlob(segments, false, response)
+                GET -> getOrHeadBlob(firstSegments, lastSegment, true, response)
+                HEAD -> getOrHeadBlob(firstSegments, lastSegment, false, response)
                 DELETE -> response.status(405).send()
                 else -> response.status(405).send()
             }
 
-            "uploads" -> if (segments[segments.lastIndex - 2] == "blobs") {
+            "uploads" -> if (firstSegments.endsWith("/blobs")) {
                 when (request.method()) {
                     POST, GET, PATCH, PUT, DELETE -> response.status(405).send()
                     else -> response.status(405).send()
@@ -104,12 +107,11 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
     }
 
     private fun getOrHeadManifest(
-        segments: List<String>,
+        name: String,
+        reference: String,
         isGET: Boolean,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val name = decodeName(segments, segments.lastIndex - 1)
-        val reference = segments[segments.lastIndex]
         val manifestFile = if (':' in reference) {
             storage.getManifest(name, reference.toOciDigest())
         } else {
@@ -121,14 +123,16 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         return if (isGET) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
     }
 
-    private fun getOrHeadBlob(segments: List<String>, isGET: Boolean, response: HttpServerResponse): Publisher<Void> {
-        val name = decodeName(segments, segments.lastIndex - 1)
-        val digest = segments[segments.lastIndex].toOciDigest()
+    private fun getOrHeadBlob(
+        name: String,
+        rawDigest: String,
+        isGET: Boolean,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val digest = rawDigest.toOciDigest()
         val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
         response.header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM)
         response.header(HttpHeaderNames.CONTENT_LENGTH, blobFile.fileSize().toString())
         return if (isGET) response.sendFile(blobFile) else response.send()
     }
-
-    private fun decodeName(segments: List<String>, toIndex: Int) = segments.subList(0, toIndex).joinToString("/")
 }
