@@ -119,7 +119,7 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         val manifestFile = if (':' in reference) {
             val digest = try {
                 reference.toOciDigest()
-            } catch (e: NumberFormatException) {
+            } catch (e: IllegalArgumentException) {
                 return response.sendBadRequest()
             }
             storage.getManifest(name, digest)
@@ -140,7 +140,7 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
     ): Publisher<Void> {
         val digest = try {
             rawDigest.toOciDigest()
-        } catch (e: NumberFormatException) {
+        } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
@@ -197,7 +197,7 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
     private fun headBlob(name: String, rawDigest: String, response: HttpServerResponse): Publisher<Void> {
         val digest = try {
             rawDigest.toOciDigest()
-        } catch (e: NumberFormatException) {
+        } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
