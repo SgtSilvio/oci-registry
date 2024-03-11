@@ -1,5 +1,8 @@
 package io.github.sgtsilvio.oci.registry
 
+import io.github.sgtsilvio.oci.registry.http.contentRangeHeaderValue
+import io.github.sgtsilvio.oci.registry.http.createRange
+import io.github.sgtsilvio.oci.registry.http.decodeHttpRangeSpecs
 import io.netty.handler.codec.http.HttpHeaderNames.*
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
@@ -146,48 +149,23 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
         val size = blobFile.fileSize()
         val rangeHeader: String? = request.requestHeaders()[RANGE]
-        if ((rangeHeader != null) && rangeHeader.startsWith("bytes=") && (',' !in rangeHeader)) {
-            val rangeParts = rangeHeader.substring("bytes=".length).split('-')
-            if (rangeParts.size != 2) {
+        if ((rangeHeader != null) && rangeHeader.startsWith("bytes=")) {
+            val rangeSpecs = try {
+                rangeHeader.substring("bytes=".length).decodeHttpRangeSpecs()
+            } catch (e: IllegalArgumentException) {
                 return response.sendBadRequest()
             }
-            val rangePart1 = rangeParts[0].trim()
-            val rangePart2 = rangeParts[1].trim()
-            val start: Long
-            val end: Long
-            if (rangePart1.isEmpty()) {
-                end = size
-                start = size - try {
-                    rangePart2.toLong()
-                } catch (e: NumberFormatException) {
-                    return response.sendBadRequest()
-                }
-                if (start < 0) {
+            if (rangeSpecs.size == 1) {
+                val range = try {
+                    rangeSpecs[0].createRange(size)
+                } catch (e: IllegalArgumentException) {
                     return response.sendRangeNotSatisfiable(size)
                 }
-            } else {
-                start = try {
-                    rangePart1.toLong()
-                } catch (e: NumberFormatException) {
-                    return response.sendBadRequest()
-                }
-                end = if (rangePart2.isEmpty()) size else try {
-                    rangePart2.toLong() + 1
-                } catch (e: NumberFormatException) {
-                    return response.sendBadRequest()
-                }
-                if (start >= end) {
-                    return response.sendBadRequest()
-                }
-                if ((start >= size) || (end > size)) {
-                    return response.sendRangeNotSatisfiable(size)
-                }
+                response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+                response.header(CONTENT_LENGTH, range.size.toString())
+                response.header(CONTENT_RANGE, contentRangeHeaderValue(range, size))
+                return response.status(PARTIAL_CONTENT).sendFile(blobFile, range.first, range.size)
             }
-            val partialSize = end - start
-            response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
-            response.header(CONTENT_LENGTH, partialSize.toString())
-            response.header(CONTENT_RANGE, "bytes $start-${end - 1}/$size")
-            return response.status(PARTIAL_CONTENT).sendFile(blobFile, start, partialSize)
         }
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, size.toString())
