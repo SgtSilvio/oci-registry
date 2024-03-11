@@ -1,9 +1,9 @@
 package io.github.sgtsilvio.oci.registry
 
-import io.netty.handler.codec.http.HttpHeaderNames
-import io.netty.handler.codec.http.HttpHeaderValues
+import io.netty.handler.codec.http.HttpHeaderNames.*
+import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
-import io.netty.handler.codec.http.HttpResponseStatus
+import io.netty.handler.codec.http.HttpResponseStatus.*
 import org.json.JSONObject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
@@ -57,12 +57,12 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         when (path) {
             "", "/" -> return when (request.method()) {
                 GET, HEAD -> response.header("Docker-Distribution-API-Version", "registry/2.0").send()
-                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                else -> response.status(METHOD_NOT_ALLOWED).send()
             }
 
             "/_catalog" -> return when (request.method()) {
-                GET -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
-                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                GET -> response.status(METHOD_NOT_ALLOWED).send()
+                else -> response.status(METHOD_NOT_ALLOWED).send()
             }
         }
         val lastSlashIndex = path.lastIndexOf('/')
@@ -76,8 +76,8 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         return when (secondLastSegment) {
             "tags" -> when (lastSegment) {
                 "list" -> when (request.method()) {
-                    GET -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
-                    else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                    GET -> response.status(METHOD_NOT_ALLOWED).send()
+                    else -> response.status(METHOD_NOT_ALLOWED).send()
                 }
 
                 else -> response.sendNotFound()
@@ -86,21 +86,21 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
             "manifests" -> when (request.method()) {
                 GET -> getOrHeadManifest(firstSegments, lastSegment, true, response)
                 HEAD -> getOrHeadManifest(firstSegments, lastSegment, false, response)
-                PUT, DELETE -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
-                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                PUT, DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+                else -> response.status(METHOD_NOT_ALLOWED).send()
             }
 
             "blobs" -> when (request.method()) {
                 GET -> getOrHeadBlob(firstSegments, lastSegment, true, response)
                 HEAD -> getOrHeadBlob(firstSegments, lastSegment, false, response)
-                DELETE -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
-                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+                else -> response.status(METHOD_NOT_ALLOWED).send()
             }
 
             "uploads" -> when {
                 firstSegments.endsWith("/blobs") -> when (request.method()) {
-                    POST, GET, PATCH, PUT, DELETE -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
-                    else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                    POST, GET, PATCH, PUT, DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+                    else -> response.status(METHOD_NOT_ALLOWED).send()
                 }
 
                 else -> response.sendNotFound()
@@ -122,8 +122,8 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
             storage.getManifest(name, reference)
         } ?: return response.sendNotFound()
         val manifestBytes = manifestFile.readBytes()
-        response.header(HttpHeaderNames.CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
-        response.header(HttpHeaderNames.CONTENT_LENGTH, manifestBytes.size.toString())
+        response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
+        response.header(CONTENT_LENGTH, manifestBytes.size.toString())
         return if (isGET) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
     }
 
@@ -135,8 +135,8 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
     ): Publisher<Void> {
         val digest = rawDigest.toOciDigest()
         val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
-        response.header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM)
-        response.header(HttpHeaderNames.CONTENT_LENGTH, blobFile.fileSize().toString())
+        response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+        response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
         return if (isGET) response.sendFile(blobFile) else response.send()
     }
 }
