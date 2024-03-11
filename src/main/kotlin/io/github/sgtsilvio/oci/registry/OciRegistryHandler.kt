@@ -163,7 +163,7 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
                 }
                 response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
                 response.header(CONTENT_LENGTH, range.size.toString())
-                response.header(CONTENT_RANGE, contentRangeHeaderValue(range, size))
+                response.header(CONTENT_RANGE, range.contentRangeHeaderValue(size))
                 return response.status(PARTIAL_CONTENT).sendFile(blobFile, range.first, range.size)
             }
         }

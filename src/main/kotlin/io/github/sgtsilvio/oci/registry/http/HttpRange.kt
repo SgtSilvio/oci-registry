@@ -56,4 +56,4 @@ internal data class HttpRange(val first: Long, val last: Long) {
     val size get() = last - first + 1
 }
 
-internal fun contentRangeHeaderValue(range: HttpRange, size: Long) = "bytes ${range.first}-${range.last}/$size"
+internal fun HttpRange.contentRangeHeaderValue(size: Long) = "bytes $first-$last/$size"
