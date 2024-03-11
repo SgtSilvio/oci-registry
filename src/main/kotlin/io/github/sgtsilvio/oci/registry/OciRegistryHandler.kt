@@ -3,6 +3,7 @@ package io.github.sgtsilvio.oci.registry
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpMethod.*
+import io.netty.handler.codec.http.HttpResponseStatus
 import org.json.JSONObject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
@@ -14,7 +15,6 @@ import kotlin.io.path.readBytes
 
 /*
 https://github.com/opencontainers/distribution-spec/blob/main/spec.md
-https://docs.docker.com/registry/spec/api/
 
 end-1   GET	    /v2/                                                        200     ✔
 end-2   GET	    /v2/<name>/blobs/<digest>                                   200/404 ✔
@@ -33,8 +33,8 @@ end-5   PATCH   /v2/<name>/blobs/uploads/<reference>                        405 
 end-6   PUT     /v2/<name>/blobs/uploads/<reference>?digest=<digest>        405     ✔
 end-8a  GET     /v2/<name>/tags/list                                        405     ✔
 end-8b  GET     /v2/<name>/tags/list?n=<integer>&last=<tag name>            405     ✔
-end-12a GET     /v2/<name>/referrers/<digest>
-end-12b GET     /v2/<name>/referrers/<digest>?artifactType=<artifactType>
+end-12a GET     /v2/<name>/referrers/<digest>                               404
+end-12b GET     /v2/<name>/referrers/<digest>?artifactType=<artifactType>   404
         GET     /v2/_catalog                                                405     ✔
         GET     /v2/_catalog?n=<integer>&last=<repository name>             405     ✔
  */
@@ -57,12 +57,12 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         when (path) {
             "", "/" -> return when (request.method()) {
                 GET, HEAD -> response.header("Docker-Distribution-API-Version", "registry/2.0").send()
-                else -> response.status(405).send()
+                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
             }
 
             "/_catalog" -> return when (request.method()) {
-                GET -> response.status(405).send()
-                else -> response.status(405).send()
+                GET -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
             }
         }
         val lastSlashIndex = path.lastIndexOf('/')
@@ -76,8 +76,8 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         return when (secondLastSegment) {
             "tags" -> when (lastSegment) {
                 "list" -> when (request.method()) {
-                    GET -> response.status(405).send()
-                    else -> response.status(405).send()
+                    GET -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                    else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
                 }
 
                 else -> response.sendNotFound()
@@ -86,21 +86,21 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
             "manifests" -> when (request.method()) {
                 GET -> getOrHeadManifest(firstSegments, lastSegment, true, response)
                 HEAD -> getOrHeadManifest(firstSegments, lastSegment, false, response)
-                PUT, DELETE -> response.status(405).send()
-                else -> response.status(405).send()
+                PUT, DELETE -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
             }
 
             "blobs" -> when (request.method()) {
                 GET -> getOrHeadBlob(firstSegments, lastSegment, true, response)
                 HEAD -> getOrHeadBlob(firstSegments, lastSegment, false, response)
-                DELETE -> response.status(405).send()
-                else -> response.status(405).send()
+                DELETE -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
             }
 
             "uploads" -> when {
                 firstSegments.endsWith("/blobs") -> when (request.method()) {
-                    POST, GET, PATCH, PUT, DELETE -> response.status(405).send()
-                    else -> response.status(405).send()
+                    POST, GET, PATCH, PUT, DELETE -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
+                    else -> response.status(HttpResponseStatus.METHOD_NOT_ALLOWED).send()
                 }
 
                 else -> response.sendNotFound()
