@@ -1,12 +1,11 @@
 package io.github.sgtsilvio.oci.registry
 
-import io.github.sgtsilvio.oci.registry.http.contentRangeHeaderValue
-import io.github.sgtsilvio.oci.registry.http.createRange
-import io.github.sgtsilvio.oci.registry.http.decodeHttpRangeSpecs
+import io.github.sgtsilvio.oci.registry.http.*
 import io.netty.handler.codec.http.HttpHeaderNames.*
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
-import io.netty.handler.codec.http.HttpResponseStatus.*
+import io.netty.handler.codec.http.HttpResponseStatus.METHOD_NOT_ALLOWED
+import io.netty.handler.codec.http.HttpResponseStatus.PARTIAL_CONTENT
 import org.json.JSONObject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
@@ -183,9 +182,4 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
         return response.send()
     }
-
-    private fun HttpServerResponse.sendBadRequest(): Mono<Void> = status(BAD_REQUEST).send()
-
-    private fun HttpServerResponse.sendRangeNotSatisfiable(size: Long): Mono<Void> =
-        status(REQUESTED_RANGE_NOT_SATISFIABLE).header(CONTENT_RANGE, "bytes */$size").send()
 }
