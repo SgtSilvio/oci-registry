@@ -91,8 +91,8 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
             }
 
             "blobs" -> when (request.method()) {
-                GET -> getOrHeadBlob(firstSegments, lastSegment, true, response)
-                HEAD -> getOrHeadBlob(firstSegments, lastSegment, false, response)
+                GET -> getBlob(firstSegments, lastSegment, request, response)
+                HEAD -> headBlob(firstSegments, lastSegment, response)
                 DELETE -> response.status(METHOD_NOT_ALLOWED).send()
                 else -> response.status(METHOD_NOT_ALLOWED).send()
             }
@@ -117,7 +117,12 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         response: HttpServerResponse,
     ): Publisher<Void> {
         val manifestFile = if (':' in reference) {
-            storage.getManifest(name, reference.toOciDigest())
+            val digest = try {
+                reference.toOciDigest()
+            } catch (e: NumberFormatException) {
+                return response.sendBadRequest()
+            }
+            storage.getManifest(name, digest)
         } else {
             storage.getManifest(name, reference)
         } ?: return response.sendNotFound()
@@ -127,16 +132,82 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         return if (isGET) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
     }
 
-    private fun getOrHeadBlob(
+    private fun getBlob(
         name: String,
         rawDigest: String,
-        isGET: Boolean,
+        request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val digest = rawDigest.toOciDigest()
+        val digest = try {
+            rawDigest.toOciDigest()
+        } catch (e: NumberFormatException) {
+            return response.sendBadRequest()
+        }
+        val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
+        val size = blobFile.fileSize()
+        val rangeHeader: String? = request.requestHeaders()[RANGE]
+        if ((rangeHeader != null) && rangeHeader.startsWith("bytes=") && (',' !in rangeHeader)) {
+            val rangeParts = rangeHeader.substring("bytes=".length).split('-')
+            if (rangeParts.size != 2) {
+                return response.sendBadRequest()
+            }
+            val rangePart1 = rangeParts[0].trim()
+            val rangePart2 = rangeParts[1].trim()
+            val start: Long
+            val end: Long
+            if (rangePart1.isEmpty()) {
+                end = size
+                start = size - try {
+                    rangePart2.toLong()
+                } catch (e: NumberFormatException) {
+                    return response.sendBadRequest()
+                }
+                if (start < 0) {
+                    return response.sendRangeNotSatisfiable(size)
+                }
+            } else {
+                start = try {
+                    rangePart1.toLong()
+                } catch (e: NumberFormatException) {
+                    return response.sendBadRequest()
+                }
+                end = if (rangePart2.isEmpty()) size else try {
+                    rangePart2.toLong() + 1
+                } catch (e: NumberFormatException) {
+                    return response.sendBadRequest()
+                }
+                if (start >= end) {
+                    return response.sendBadRequest()
+                }
+                if ((start >= size) || (end > size)) {
+                    return response.sendRangeNotSatisfiable(size)
+                }
+            }
+            val partialSize = end - start
+            response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+            response.header(CONTENT_LENGTH, partialSize.toString())
+            response.header(CONTENT_RANGE, "bytes $start-${end - 1}/$size")
+            return response.status(PARTIAL_CONTENT).sendFile(blobFile, start, partialSize)
+        }
+        response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+        response.header(CONTENT_LENGTH, size.toString())
+        return response.sendFile(blobFile, 0, size)
+    }
+
+    private fun headBlob(name: String, rawDigest: String, response: HttpServerResponse): Publisher<Void> {
+        val digest = try {
+            rawDigest.toOciDigest()
+        } catch (e: NumberFormatException) {
+            return response.sendBadRequest()
+        }
         val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
-        return if (isGET) response.sendFile(blobFile) else response.send()
+        return response.send()
     }
+
+    private fun HttpServerResponse.sendBadRequest(): Mono<Void> = status(BAD_REQUEST).send()
+
+    private fun HttpServerResponse.sendRangeNotSatisfiable(size: Long): Mono<Void> =
+        status(REQUESTED_RANGE_NOT_SATISFIABLE).header(CONTENT_RANGE, "bytes */$size").send()
 }
