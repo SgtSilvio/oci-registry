@@ -281,6 +281,51 @@ class OciRegistryTest {
     }
 
     @Test
+    fun getBlobRange_lastPositionGreaterThanSize() {
+        val data = BlobData()
+        val first = 25
+        val requestedLast = data.blob.size + 10
+        val last = data.blob.size - 1
+        val count = last - first + 1
+        val responseBody = HttpClient.newConnection()
+            .headers { headers -> headers[RANGE] = "bytes=$first-$requestedLast" }
+            .get()
+            .uri(uri("/v2/${data.repository}/blobs/${data.digestAlgorithm}:${data.digestHash}"))
+            .responseSingle { response, body ->
+                assertEquals(PARTIAL_CONTENT, response.status())
+                assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
+                assertEquals(count.toString(), response.responseHeaders()[CONTENT_LENGTH])
+                assertEquals("bytes $first-$last/${data.blob.size}", response.responseHeaders()[CONTENT_RANGE])
+                assertEquals(3, response.responseHeaders().size())
+                body.asByteArray()
+            }
+            .block()
+        assertArrayEquals(data.blob.sliceArray(first..last), responseBody)
+    }
+
+    @Test
+    fun getBlobRangeWithOpenEnd() {
+        val data = BlobData()
+        val first = 25
+        val last = data.blob.size - 1
+        val count = last - first + 1
+        val responseBody = HttpClient.newConnection()
+            .headers { headers -> headers[RANGE] = "bytes=$first-" }
+            .get()
+            .uri(uri("/v2/${data.repository}/blobs/${data.digestAlgorithm}:${data.digestHash}"))
+            .responseSingle { response, body ->
+                assertEquals(PARTIAL_CONTENT, response.status())
+                assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
+                assertEquals(count.toString(), response.responseHeaders()[CONTENT_LENGTH])
+                assertEquals("bytes $first-$last/${data.blob.size}", response.responseHeaders()[CONTENT_RANGE])
+                assertEquals(3, response.responseHeaders().size())
+                body.asByteArray()
+            }
+            .block()
+        assertArrayEquals(data.blob.sliceArray(first..last), responseBody)
+    }
+
+    @Test
     fun getBlobSuffixRange() {
         val data = BlobData()
         val count = 10
@@ -300,5 +345,27 @@ class OciRegistryTest {
             }
             .block()
         assertArrayEquals(data.blob.sliceArray(first..last), responseBody)
+    }
+
+    @Test
+    fun getBlobSuffixRange_suffixLengthGreaterThanSize() {
+        val data = BlobData()
+        val responseBody = HttpClient.newConnection()
+            .headers { headers -> headers[RANGE] = "bytes=-${data.blob.size + 10}" }
+            .get()
+            .uri(uri("/v2/${data.repository}/blobs/${data.digestAlgorithm}:${data.digestHash}"))
+            .responseSingle { response, body ->
+                assertEquals(PARTIAL_CONTENT, response.status())
+                assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
+                assertEquals(data.blob.size.toString(), response.responseHeaders()[CONTENT_LENGTH])
+                assertEquals(
+                    "bytes 0-${data.blob.size - 1}/${data.blob.size}",
+                    response.responseHeaders()[CONTENT_RANGE],
+                )
+                assertEquals(3, response.responseHeaders().size())
+                body.asByteArray()
+            }
+            .block()
+        assertArrayEquals(data.blob, responseBody)
     }
 }
