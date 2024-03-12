@@ -44,6 +44,14 @@ dependencies {
     implementation(libs.json)
 }
 
+testing {
+    suites {
+        "test"(JvmTestSuite::class) {
+            useJUnitJupiter(libs.versions.junit.jupiter)
+        }
+    }
+}
+
 publishing {
     publications {
         register<MavenPublication>("maven") {
