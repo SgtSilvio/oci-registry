@@ -162,6 +162,22 @@ class OciRegistryTest {
         assertNull(responseBody)
     }
 
+    @Test
+    fun getManifestByDigest_fromOtherRepository_notFound() {
+        val data = ManifestByDigestData()
+        val responseBody = HttpClient.newConnection()
+            .get()
+            .uri(uri("/v2/${data.repository}-other/manifests/${data.digestAlgorithm}:${data.digestHash}"))
+            .responseSingle { response, body ->
+                assertEquals(NOT_FOUND, response.status())
+                assertEquals("0", response.responseHeaders()[CONTENT_LENGTH])
+                assertEquals(1, response.responseHeaders().size())
+                body.asString(Charsets.UTF_8)
+            }
+            .block()
+        assertNull(responseBody)
+    }
+
     inner class BlobData {
         val repository = "example/repository-" + Random.nextInt()
         val digestAlgorithm = "alg-" + Random.nextInt()
