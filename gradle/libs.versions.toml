@@ -1,6 +1,6 @@
 [versions]
 json = "20240303"
-reactor-netty = "1.1.16"
+reactor-netty = "1.1.17"
 
 [libraries]
 json = { module = "org.json:json", version.ref = "json" }
