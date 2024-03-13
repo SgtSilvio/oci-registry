@@ -55,7 +55,7 @@ class OciRegistryTest {
         assertEquals("registry/2.0", response.responseHeaders()["Docker-Distribution-API-Version"])
     }
 
-    inner class ManifestByTagData {
+    private inner class ManifestByTagData {
         val repository = "example/repository-" + Random.nextInt()
         val tag = "tag-" + Random.nextInt()
         val mediaType = "mediaType-" + Random.nextInt()
@@ -109,7 +109,7 @@ class OciRegistryTest {
         assertNull(responseBody)
     }
 
-    inner class ManifestByDigestData {
+    private inner class ManifestByDigestData {
         val repository = "example/repository-" + Random.nextInt()
         val digestAlgorithm = "alg-" + Random.nextInt()
         val digestHash = "hash-" + Random.nextInt()
@@ -178,7 +178,7 @@ class OciRegistryTest {
         assertNull(responseBody)
     }
 
-    inner class BlobData {
+    private inner class BlobData {
         val repository = "example/repository-" + Random.nextInt()
         val digestAlgorithm = "alg-" + Random.nextInt()
         val digestHash = "hash-" + Random.nextInt()

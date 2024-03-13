@@ -30,7 +30,7 @@ private fun String.decodeHttpRangeSpec(): HttpRangeSpec {
     return HttpRangeSpec(first, last)
 }
 
-internal class HttpRangeSpec(val first: Long, val last: Long) {
+internal data class HttpRangeSpec(val first: Long, val last: Long) {
     override fun toString() = buildString {
         if (first != -1L) append(first)
         append('-')
