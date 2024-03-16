@@ -9,10 +9,10 @@ plugins {
 }
 
 group = "io.github.sgtsilvio"
-description = "OCI registry Java library that allows serving OCI artifacts to pull operations"
 
 metadata {
     readableName = "OCI Registry Java Library"
+    description = "OCI registry Java library that allows serving OCI artifacts to pull operations"
     license {
         apache2()
     }
