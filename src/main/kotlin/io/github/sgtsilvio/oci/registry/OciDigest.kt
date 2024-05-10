@@ -10,7 +10,9 @@ internal data class OciDigest(val algorithm: String, val hash: String) : Seriali
 }
 
 internal fun String.toOciDigest(): OciDigest {
-    val separator = indexOf(':')
-    if (separator == -1) throw IllegalArgumentException("'$this' is not an OCI digest")
-    return OciDigest(substring(0, separator), substring(separator + 1))
+    val colonIndex = indexOf(':')
+    if (colonIndex == -1) {
+        throw IllegalArgumentException("missing ':' in digest '$this'")
+    }
+    return OciDigest(substring(0, colonIndex), substring(colonIndex + 1))
 }
