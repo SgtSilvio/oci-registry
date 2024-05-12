@@ -115,7 +115,7 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
     private fun getOrHeadManifest(
         name: String,
         reference: String,
-        isGET: Boolean,
+        isGet: Boolean,
         response: HttpServerResponse,
     ): Publisher<Void> {
         val manifestFile = if (':' in reference) {
@@ -131,7 +131,7 @@ class OciRegistryHandler(private val storage: OciRegistryStorage) :
         val manifestBytes = manifestFile.readBytes()
         response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
         response.header(CONTENT_LENGTH, manifestBytes.size.toString())
-        return if (isGET) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
+        return if (isGet) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
     }
 
     private fun getBlob(
