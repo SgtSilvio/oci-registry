@@ -1,11 +1,9 @@
 package io.github.sgtsilvio.oci.registry
 
-import java.io.Serializable
-
 /**
  * @author Silvio Giebl
  */
-internal data class OciDigest(val algorithm: String, val hash: String) : Serializable {
+internal data class OciDigest(val algorithm: String, val hash: String) {
     override fun toString() = "$algorithm:$hash"
 }
 
