@@ -1,7 +1,7 @@
 [versions]
 json = "20240303"
 junit-jupiter = "5.11.3"
-reactor-netty = "1.2.0"
+reactor-netty = "1.2.1"
 
 [libraries]
 json = { module = "org.json:json", version.ref = "json" }
