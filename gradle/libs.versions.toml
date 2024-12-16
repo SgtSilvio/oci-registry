@@ -1,6 +1,6 @@
 [versions]
 json = "20240303"
-junit-jupiter = "5.11.3"
+junit-jupiter = "5.11.4"
 reactor-netty = "1.2.1"
 
 [libraries]
