@@ -44,8 +44,9 @@ end-12b GET     /v2/<name>/referrers/<digest>?artifactType=<artifactType>   404
 /**
  * @author Silvio Giebl
  */
-class OciRegistryHandler(private val storage: OciRegistryStorage) :
-    BiFunction<HttpServerRequest, HttpServerResponse, Publisher<Void>> {
+class OciRegistryHandler(
+    private val storage: OciRegistryStorage,
+) : BiFunction<HttpServerRequest, HttpServerResponse, Publisher<Void>> {
 
     override fun apply(request: HttpServerRequest, response: HttpServerResponse): Publisher<Void> {
         val path = request.fullPath().substring(1)
