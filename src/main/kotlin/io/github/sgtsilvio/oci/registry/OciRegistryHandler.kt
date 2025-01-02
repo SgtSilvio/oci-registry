@@ -64,10 +64,7 @@ class OciRegistryHandler(
                 else -> response.status(METHOD_NOT_ALLOWED).send()
             }
 
-            "/_catalog" -> return when (request.method()) {
-                GET -> response.status(METHOD_NOT_ALLOWED).send()
-                else -> response.status(METHOD_NOT_ALLOWED).send()
-            }
+            "/_catalog" -> return handleCatalog(request, response)
         }
         val lastSlashIndex = path.lastIndexOf('/')
         val secondLastSlashIndex = path.lastIndexOf('/', lastSlashIndex - 1)
@@ -79,50 +76,39 @@ class OciRegistryHandler(
         val lastSegment = path.substring(lastSlashIndex + 1)
         return when (secondLastSegment) {
             "tags" -> when (lastSegment) {
-                "list" -> when (request.method()) {
-                    GET -> getTags(firstSegments, response)
-                    else -> response.status(METHOD_NOT_ALLOWED).send()
-                }
-
+                "list" -> handleTags(firstSegments, request, response)
                 else -> response.sendNotFound()
             }
 
-            "manifests" -> when (request.method()) {
-                GET -> getOrHeadManifest(firstSegments, lastSegment, true, response)
-                HEAD -> getOrHeadManifest(firstSegments, lastSegment, false, response)
-                PUT -> putManifest(firstSegments, lastSegment, request, response)
-                DELETE -> response.status(METHOD_NOT_ALLOWED).send()
-                else -> response.status(METHOD_NOT_ALLOWED).send()
-            }
-
-            "blobs" -> when (request.method()) {
-                GET -> getBlob(firstSegments, lastSegment, request, response)
-                HEAD -> headBlob(firstSegments, lastSegment, response)
-                DELETE -> response.status(METHOD_NOT_ALLOWED).send()
-                else -> response.status(METHOD_NOT_ALLOWED).send()
-            }
-
+            "manifests" -> handleManifest(firstSegments, lastSegment, request, response)
+            "blobs" -> handleBlob(firstSegments, lastSegment, request, response)
             "uploads" -> when {
-                firstSegments.endsWith("/blobs") -> when (lastSegment) {
-                    "" -> when (request.method()) {
-                        POST -> postBlobUpload(firstSegments, request, response)
-                        else -> response.status(METHOD_NOT_ALLOWED).send()
-                    }
-
-                    else -> when (request.method()) {
-                        GET, HEAD -> getOrHeadBlobUpload(firstSegments, lastSegment, request, response)
-                        PATCH -> patchBlobUpload(firstSegments, lastSegment, request, response)
-                        PUT -> putBlobUpload(firstSegments, lastSegment, request, response)
-                        DELETE -> response.status(METHOD_NOT_ALLOWED).send()
-                        else -> response.status(METHOD_NOT_ALLOWED).send()
-                    }
-                }
+                firstSegments.endsWith("/blobs") -> handleBlobUpload(
+                    firstSegments.removeSuffix("/blobs"), lastSegment, request, response
+                )
 
                 else -> response.sendNotFound()
             }
 
             else -> response.sendNotFound()
         }
+    }
+
+    private fun handleCatalog(
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> = when (request.method()) {
+        GET -> response.status(METHOD_NOT_ALLOWED).send()
+        else -> response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun handleTags(
+        repositoryName: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> = when (request.method()) {
+        GET -> getTags(repositoryName, response)
+        else -> response.status(METHOD_NOT_ALLOWED).send()
     }
 
     private fun getTags(repositoryName: String, response: HttpServerResponse): Publisher<Void> {
@@ -139,6 +125,19 @@ class OciRegistryHandler(
 //        If the list is not empty, the tags MUST be in lexical order (i.e. case-insensitive alphanumeric order).
 //        TODO ?n=<integer>&last=<tag name>
         return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun handleManifest(
+        repositoryName: String,
+        reference: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> = when (request.method()) {
+        GET -> getOrHeadManifest(repositoryName, reference, true, response)
+        HEAD -> getOrHeadManifest(repositoryName, reference, false, response)
+        PUT -> putManifest(repositoryName, reference, request, response)
+        DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+        else -> response.status(METHOD_NOT_ALLOWED).send()
     }
 
     private fun getOrHeadManifest(
@@ -225,7 +224,7 @@ class OciRegistryHandler(
         return response.status(CREATED).send()
     }
 
-    private fun getBlob(
+    private fun handleBlob(
         repositoryName: String,
         rawDigest: String,
         request: HttpServerRequest,
@@ -236,6 +235,20 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
+        return when (request.method()) {
+            GET -> getBlob(repositoryName, digest, request, response)
+            HEAD -> headBlob(repositoryName, digest, response)
+            DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+            else -> response.status(METHOD_NOT_ALLOWED).send()
+        }
+    }
+
+    private fun getBlob(
+        repositoryName: String,
+        digest: OciDigest,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
         val blobFile = storage.getBlob(repositoryName, digest) ?: return response.sendNotFound()
         val size = blobFile.fileSize()
         val rangeHeader: String? = request.requestHeaders()[RANGE]
@@ -262,16 +275,31 @@ class OciRegistryHandler(
         return response.sendFile(blobFile, 0, size)
     }
 
-    private fun headBlob(repositoryName: String, rawDigest: String, response: HttpServerResponse): Publisher<Void> {
-        val digest = try {
-            rawDigest.toOciDigest()
-        } catch (e: IllegalArgumentException) {
-            return response.sendBadRequest()
-        }
+    private fun headBlob(repositoryName: String, digest: OciDigest, response: HttpServerResponse): Publisher<Void> {
         val blobFile = storage.getBlob(repositoryName, digest) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
         return response.send()
+    }
+
+    private fun handleBlobUpload(
+        repositoryName: String,
+        id: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> = when (id) {
+        "" -> when (request.method()) {
+            POST -> postBlobUpload(repositoryName, request, response)
+            else -> response.status(METHOD_NOT_ALLOWED).send()
+        }
+
+        else -> when (request.method()) {
+            GET, HEAD -> getOrHeadBlobUpload(repositoryName, id, request, response)
+            PATCH -> patchBlobUpload(repositoryName, id, request, response)
+            PUT -> putBlobUpload(repositoryName, id, request, response)
+            DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+            else -> response.status(METHOD_NOT_ALLOWED).send()
+        }
     }
 
     private fun postBlobUpload(
