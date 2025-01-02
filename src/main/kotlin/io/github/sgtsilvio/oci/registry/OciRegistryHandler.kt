@@ -80,7 +80,7 @@ class OciRegistryHandler(
         return when (secondLastSegment) {
             "tags" -> when (lastSegment) {
                 "list" -> when (request.method()) {
-                    GET -> response.status(METHOD_NOT_ALLOWED).send()
+                    GET -> getTags(firstSegments, response)
                     else -> response.status(METHOD_NOT_ALLOWED).send()
                 }
 
@@ -123,6 +123,22 @@ class OciRegistryHandler(
 
             else -> response.sendNotFound()
         }
+    }
+
+    private fun getTags(repositoryName: String, response: HttpServerResponse): Publisher<Void> {
+//        status: 200, or 404
+//        response.header(CONTENT_TYPE, APPLICATION_JSON)
+//        body: {
+//          "name": "<name>",
+//          "tags": [
+//            "<tag1>",
+//            "<tag2>",
+//            "<tag3>"
+//          ]
+//        }
+//        If the list is not empty, the tags MUST be in lexical order (i.e. case-insensitive alphanumeric order).
+//        TODO ?n=<integer>&last=<tag name>
+        return response.status(METHOD_NOT_ALLOWED).send()
     }
 
     private fun getOrHeadManifest(
