@@ -103,9 +103,19 @@ class OciRegistryHandler(
             }
 
             "uploads" -> when {
-                firstSegments.endsWith("/blobs") -> when (request.method()) {
-                    POST, GET, PATCH, PUT, DELETE -> response.status(METHOD_NOT_ALLOWED).send()
-                    else -> response.status(METHOD_NOT_ALLOWED).send()
+                firstSegments.endsWith("/blobs") -> when (lastSegment) {
+                    "" -> when (request.method()) {
+                        POST -> postBlobUpload(firstSegments, request, response)
+                        else -> response.status(METHOD_NOT_ALLOWED).send()
+                    }
+
+                    else -> when (request.method()) {
+                        GET, HEAD -> getOrHeadBlobUpload(firstSegments, lastSegment, request, response)
+                        PATCH -> patchBlobUpload(firstSegments, lastSegment, request, response)
+                        PUT -> putBlobUpload(firstSegments, lastSegment, request, response)
+                        DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+                        else -> response.status(METHOD_NOT_ALLOWED).send()
+                    }
                 }
 
                 else -> response.sendNotFound()
@@ -247,4 +257,139 @@ class OciRegistryHandler(
         response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
         return response.send()
     }
+
+    private fun postBlobUpload(
+        repositoryName: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val queryParameters = URI(request.uri()).queryParameters
+        val mountParameter = queryParameters["mount"]
+        val fromParameter = queryParameters["from"]
+        if ((mountParameter != null) && (fromParameter != null)) {
+            return mountBlob(repositoryName, mountParameter, fromParameter, response)
+        }
+        val digestParameter = queryParameters["digest"]
+        if (digestParameter != null) {
+            return putBlob(repositoryName, digestParameter, request, response)
+        }
+        return createBlobUpload(repositoryName, response)
+    }
+
+    private fun putBlob(
+        repositoryName: String,
+        rawDigest: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val digest = try {
+            rawDigest.toOciDigest()
+        } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
+            return response.sendBadRequest()
+        }
+//        request headers:
+//            Content-Length: <length>
+//        response.status(CREATED)
+//        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+//        request.receive()
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun mountBlob(
+        repositoryName: String,
+        rawDigest: String,
+        fromRepositoryName: String,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val digest = try { // TODO move to mountBlob?
+            rawDigest.toOciDigest()
+        } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+//        response.status(CREATED)
+//        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+//        fall back to createBlobUpload when blob is not found
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun createBlobUpload(repositoryName: String, response: HttpServerResponse): Publisher<Void> {
+//        request headers for chunked upload:
+//            Content-Length: 0
+//        response.status(ACCEPTED)
+//        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun getOrHeadBlobUpload(
+        repositoryName: String,
+        id: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+//        response.status(NO_CONTENT) // or 404
+//        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
+//        response.header(RANGE, "0-$endOfRange")
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun patchBlobUpload(
+        repositoryName: String,
+        id: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
+            return response.sendBadRequest()
+        }
+        val contentRangeHeader = request.requestHeaders()[CONTENT_RANGE] ?: return response.sendBadRequest()
+//        request headers:
+//            Content-Length: <length of chunk>
+//        response.status(ACCEPTED) // or 416 range not satisfiable, or 404
+//        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
+//        response.header(RANGE, "0-$endOfRange")
+//        request.receive()
+//        Chunks MUST be uploaded in order, with the first byte of a chunk being the last chunk's <end-of-range> plus one.
+//        If a chunk is uploaded out of order, the registry MUST respond with a 416 Requested Range Not Satisfiable code.
+//        A GET request may be used to retrieve the current valid offset and upload location.
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun putBlobUpload(
+        repositoryName: String,
+        id: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val queryParameters = URI(request.uri()).queryParameters
+        val digestParameter = queryParameters["digest"] ?: return response.sendBadRequest()
+        val digest = try {
+            digestParameter.toOciDigest()
+        } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        val contentRangeHeader = request.requestHeaders()[CONTENT_RANGE]
+        if (contentRangeHeader != null) {
+            if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
+                return response.sendBadRequest()
+            }
+//            request headers for chunked upload with last chunk:
+//                Content-Length: <length of chunk>
+        } else {
+//            request headers for monolithic upload:
+//                Content-Type: application/octet-stream
+//                Content-Length: <length>
+//            no request headers for chunked upload without last chunk
+        }
+//        response.status(CREATED) // or 416 range not satisfiable, or 404
+//        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+//        request.receive()
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+}
+
+private val URI.queryParameters get() = query.split('&').associate { // TODO move to UriExtensions
+    Pair(it.substringBefore('='), it.substringAfter('=', ""))
 }
