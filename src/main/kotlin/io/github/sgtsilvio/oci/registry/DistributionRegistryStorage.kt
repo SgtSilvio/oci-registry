@@ -8,33 +8,34 @@ import kotlin.io.path.*
  */
 class DistributionRegistryStorage(private val directory: Path) : OciRegistryStorage() {
 
-    override fun getManifest(name: String, tag: String): Path? =
-        resolveManifestTagCurrentLinkFile(name, tag).getLinkedBlobFile()
+    override fun getManifest(repositoryName: String, tag: String): Path? =
+        resolveManifestTagCurrentLinkFile(repositoryName, tag).getLinkedBlobFile()
 
-    override fun getManifest(name: String, digest: OciDigest): Path? =
-        resolveManifestLinkFile(name, digest).getLinkedBlobFile()
+    override fun getManifest(repositoryName: String, digest: OciDigest): Path? =
+        resolveManifestLinkFile(repositoryName, digest).getLinkedBlobFile()
 
-    override fun putManifest(name: String, digest: OciDigest, data: ByteArray) {
+    override fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray) {
         val blobFile = resolveBlobFile(digest)
         if (!blobFile.exists()) {
             blobFile.createParentDirectories().writeBytes(data) // TODO write to tmp file and move for atomicity
         }
-        val linkFile = resolveManifestLinkFile(name, digest)
+        val linkFile = resolveManifestLinkFile(repositoryName, digest)
         if (!linkFile.exists()) {
             linkFile.createParentDirectories().writeText(digest.toString()) // TODO write to tmp file and move for atomicity
         }
     }
 
-    override fun tagManifest(name: String, digest: OciDigest, tag: String) {
-        val currentLinkFile = resolveManifestTagCurrentLinkFile(name, tag)
+    override fun tagManifest(repositoryName: String, digest: OciDigest, tag: String) {
+        val currentLinkFile = resolveManifestTagCurrentLinkFile(repositoryName, tag)
         currentLinkFile.createParentDirectories().writeText(digest.toString()) // TODO write to tmp file and move for atomicity
-        val indexLinkFile = resolveManifestTagIndexLinkFile(name, tag, digest)
+        val indexLinkFile = resolveManifestTagIndexLinkFile(repositoryName, tag, digest)
         if (!indexLinkFile.exists()) {
             indexLinkFile.createParentDirectories().writeText(digest.toString()) // TODO write to tmp file and move for atomicity
         }
     }
 
-    override fun getBlob(name: String, digest: OciDigest): Path? = resolveBlobLinkFile(name, digest).getLinkedBlobFile()
+    override fun getBlob(repositoryName: String, digest: OciDigest): Path? =
+        resolveBlobLinkFile(repositoryName, digest).getLinkedBlobFile()
 
     private fun Path.getLinkedBlobFile(): Path? {
         if (!exists()) {
@@ -57,22 +58,23 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             .resolve("data")
     }
 
-    private fun resolveRepositoryDirectory(name: String): Path = directory.resolve("repositories").resolve(name)
+    private fun resolveRepositoryDirectory(repositoryName: String): Path =
+        directory.resolve("repositories").resolve(repositoryName)
 
-    private fun resolveManifestLinkFile(name: String, digest: OciDigest): Path =
-        resolveRepositoryDirectory(name).resolve("_manifests/revisions").resolveLinkFile(digest)
+    private fun resolveManifestLinkFile(repositoryName: String, digest: OciDigest): Path =
+        resolveRepositoryDirectory(repositoryName).resolve("_manifests/revisions").resolveLinkFile(digest)
 
-    private fun resolveManifestTagDirectory(name: String, tag: String): Path =
-        resolveRepositoryDirectory(name).resolve("_manifests/tags").resolve(tag)
+    private fun resolveManifestTagDirectory(repositoryName: String, tag: String): Path =
+        resolveRepositoryDirectory(repositoryName).resolve("_manifests/tags").resolve(tag)
 
-    private fun resolveManifestTagCurrentLinkFile(name: String, tag: String): Path =
-        resolveManifestTagDirectory(name, tag).resolve("current/link")
+    private fun resolveManifestTagCurrentLinkFile(repositoryName: String, tag: String): Path =
+        resolveManifestTagDirectory(repositoryName, tag).resolve("current/link")
 
-    private fun resolveManifestTagIndexLinkFile(name: String, tag: String, digest: OciDigest): Path =
-        resolveManifestTagDirectory(name, tag).resolve("index").resolveLinkFile(digest)
+    private fun resolveManifestTagIndexLinkFile(repositoryName: String, tag: String, digest: OciDigest): Path =
+        resolveManifestTagDirectory(repositoryName, tag).resolve("index").resolveLinkFile(digest)
 
-    private fun resolveBlobLinkFile(name: String, digest: OciDigest): Path =
-        resolveRepositoryDirectory(name).resolve("_layers").resolveLinkFile(digest)
+    private fun resolveBlobLinkFile(repositoryName: String, digest: OciDigest): Path =
+        resolveRepositoryDirectory(repositoryName).resolve("_layers").resolveLinkFile(digest)
 
     private fun Path.resolveLinkFile(digest: OciDigest): Path =
         resolve(digest.algorithm.id).resolve(digest.encodedHash).resolve("link")

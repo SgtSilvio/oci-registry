@@ -116,7 +116,7 @@ class OciRegistryHandler(
     }
 
     private fun getOrHeadManifest(
-        name: String,
+        repositoryName: String,
         reference: String,
         isGet: Boolean,
         response: HttpServerResponse,
@@ -127,9 +127,9 @@ class OciRegistryHandler(
             } catch (e: IllegalArgumentException) {
                 return response.sendBadRequest()
             }
-            storage.getManifest(name, digest)
+            storage.getManifest(repositoryName, digest)
         } else {
-            storage.getManifest(name, reference)
+            storage.getManifest(repositoryName, reference)
         } ?: return response.sendNotFound()
         val manifestBytes = manifestFile.readBytes()
         response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
@@ -138,7 +138,7 @@ class OciRegistryHandler(
     }
 
     private fun putManifest(
-        name: String,
+        repositoryName: String,
         reference: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
@@ -158,12 +158,12 @@ class OciRegistryHandler(
         }
         val contentTypeHeader = request.requestHeaders()[CONTENT_TYPE]
         return request.receive().aggregate().asByteArray().flatMap { data ->
-            putManifest(name, digest, tag, contentTypeHeader, data, response)
+            putManifest(repositoryName, digest, tag, contentTypeHeader, data, response)
         }
     }
 
     private fun putManifest(
-        name: String,
+        repositoryName: String,
         digest: OciDigest?,
         tag: String?,
         mediaType: String?,
@@ -191,16 +191,16 @@ class OciRegistryHandler(
 //            OCI_IMAGE_MANIFEST_MEDIA_TYPE, DOCKER_MANIFEST_MEDIA_TYPE -> // TODO validate blob presence in config.digest and layers[].digest (size?)
 //            else -> return response.sendBadRequest()
 //        }
-        storage.putManifest(name, actualDigest, data)
+        storage.putManifest(repositoryName, actualDigest, data)
         if (tag != null) {
-            storage.tagManifest(name, actualDigest, tag)
+            storage.tagManifest(repositoryName, actualDigest, tag)
         }
-        response.header(LOCATION, "/v2/$name/manifests/${tag ?: actualDigest}")
+        response.header(LOCATION, "/v2/$repositoryName/manifests/${tag ?: actualDigest}")
         return response.status(CREATED).send()
     }
 
     private fun getBlob(
-        name: String,
+        repositoryName: String,
         rawDigest: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
@@ -210,7 +210,7 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
+        val blobFile = storage.getBlob(repositoryName, digest) ?: return response.sendNotFound()
         val size = blobFile.fileSize()
         val rangeHeader: String? = request.requestHeaders()[RANGE]
         if ((rangeHeader != null) && rangeHeader.startsWith("bytes=")) {
@@ -236,13 +236,13 @@ class OciRegistryHandler(
         return response.sendFile(blobFile, 0, size)
     }
 
-    private fun headBlob(name: String, rawDigest: String, response: HttpServerResponse): Publisher<Void> {
+    private fun headBlob(repositoryName: String, rawDigest: String, response: HttpServerResponse): Publisher<Void> {
         val digest = try {
             rawDigest.toOciDigest()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        val blobFile = storage.getBlob(name, digest) ?: return response.sendNotFound()
+        val blobFile = storage.getBlob(repositoryName, digest) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
         return response.send()
