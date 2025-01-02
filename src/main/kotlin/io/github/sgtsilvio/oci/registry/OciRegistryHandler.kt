@@ -4,13 +4,14 @@ import io.github.sgtsilvio.oci.registry.http.*
 import io.netty.handler.codec.http.HttpHeaderNames.*
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
-import io.netty.handler.codec.http.HttpResponseStatus.METHOD_NOT_ALLOWED
-import io.netty.handler.codec.http.HttpResponseStatus.PARTIAL_CONTENT
+import io.netty.handler.codec.http.HttpResponseStatus.*
+import org.json.JSONException
 import org.json.JSONObject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import reactor.netty.http.server.HttpServerRequest
 import reactor.netty.http.server.HttpServerResponse
+import java.net.URI
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
 import kotlin.io.path.readBytes
@@ -89,7 +90,8 @@ class OciRegistryHandler(
             "manifests" -> when (request.method()) {
                 GET -> getOrHeadManifest(firstSegments, lastSegment, true, response)
                 HEAD -> getOrHeadManifest(firstSegments, lastSegment, false, response)
-                PUT, DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+                PUT -> putManifest(firstSegments, lastSegment, request, response)
+                DELETE -> response.status(METHOD_NOT_ALLOWED).send()
                 else -> response.status(METHOD_NOT_ALLOWED).send()
             }
 
@@ -133,6 +135,68 @@ class OciRegistryHandler(
         response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
         response.header(CONTENT_LENGTH, manifestBytes.size.toString())
         return if (isGet) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
+    }
+
+    private fun putManifest(
+        name: String,
+        reference: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val digest: OciDigest?
+        val tag: String?
+        if (':' in reference) {
+            digest = try {
+                reference.toOciDigest()
+            } catch (e: IllegalArgumentException) {
+                return response.sendBadRequest()
+            }
+            tag = null
+        } else {
+            digest = null
+            tag = reference
+        }
+        val contentTypeHeader = request.requestHeaders()[CONTENT_TYPE]
+        return request.receive().aggregate().asByteArray().flatMap { data ->
+            putManifest(name, digest, tag, contentTypeHeader, data, response)
+        }
+    }
+
+    private fun putManifest(
+        name: String,
+        digest: OciDigest?,
+        tag: String?,
+        mediaType: String?,
+        data: ByteArray,
+        response: HttpServerResponse,
+    ): Mono<Void> {
+        val actualDigest = data.calculateOciDigest(digest?.algorithm ?: OciDigestAlgorithm.SHA_256)
+        if ((digest != null) && (digest != actualDigest)) {
+            return response.sendBadRequest()
+        }
+        val manifestJsonObject = try {
+            JSONObject(data.decodeToString())
+        } catch (e: JSONException) {
+            return response.sendBadRequest()
+        }
+        val actualMediaType = manifestJsonObject.opt("mediaType")
+        if (actualMediaType !is String) {
+            return response.sendBadRequest()
+        }
+        if ((mediaType != null) && (mediaType != actualMediaType)) {
+            return response.sendBadRequest()
+        }
+//        when (actualMediaType) {
+//            OCI_IMAGE_INDEX_MEDIA_TYPE, DOCKER_MANIFEST_LIST_MEDIA_TYPE -> // TODO validate manifest presence in manifest[].digest (size?)
+//            OCI_IMAGE_MANIFEST_MEDIA_TYPE, DOCKER_MANIFEST_MEDIA_TYPE -> // TODO validate blob presence in config.digest and layers[].digest (size?)
+//            else -> return response.sendBadRequest()
+//        }
+        storage.putManifest(name, actualDigest, data)
+        if (tag != null) {
+            storage.tagManifest(name, actualDigest, tag)
+        }
+        response.header(LOCATION, "/v2/$name/manifests/${tag ?: actualDigest}")
+        return response.status(CREATED).send()
     }
 
     private fun getBlob(

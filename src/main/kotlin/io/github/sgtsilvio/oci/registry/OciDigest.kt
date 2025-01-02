@@ -1,10 +1,56 @@
 package io.github.sgtsilvio.oci.registry
 
+import org.apache.commons.codec.binary.Hex
+import java.security.MessageDigest
+
 /**
  * @author Silvio Giebl
  */
-internal data class OciDigest(val algorithm: String, val hash: String) {
-    override fun toString() = "$algorithm:$hash"
+// id: https://github.com/opencontainers/image-spec/blob/main/descriptor.md#registered-algorithms
+// standardName: https://docs.oracle.com/en/java/javase/21/docs/specs/security/standard-names.html#messagedigest-algorithms
+internal enum class OciDigestAlgorithm(val id: String, val standardName: String, private val hashByteLength: Int) {
+    SHA_256("sha256", "SHA-256", 32),
+    SHA_512("sha512", "SHA-512", 64);
+
+    internal fun decode(encodedHash: String): ByteArray = Hex.decodeHex(checkEncodedHash(encodedHash))
+
+    private fun checkEncodedHash(encodedHash: String): String {
+        if (encodedHash.length == (hashByteLength * 2)) return encodedHash
+        throw IllegalArgumentException("encoded hash '$encodedHash' has wrong length ${encodedHash.length}, $standardName requires ${hashByteLength * 2}")
+    }
+
+    internal fun encode(hash: ByteArray): String = Hex.encodeHexString(checkHash(hash))
+
+    internal fun checkHash(hash: ByteArray): ByteArray {
+        if (hash.size == hashByteLength) return hash
+        throw IllegalArgumentException("hash has wrong length ${hash.size}, $standardName requires $hashByteLength")
+    }
+
+    internal fun createMessageDigest(): MessageDigest = MessageDigest.getInstance(standardName)
+}
+
+internal data class OciDigest(val algorithm: OciDigestAlgorithm, val hash: ByteArray) {
+    val encodedHash get() = algorithm.encode(hash)
+
+    init {
+        algorithm.checkHash(hash)
+    }
+
+    override fun equals(other: Any?) = when {
+        this === other -> true
+        other !is OciDigest -> false
+        algorithm != other.algorithm -> false
+        !hash.contentEquals(other.hash) -> false
+        else -> true
+    }
+
+    override fun hashCode(): Int {
+        var result = algorithm.hashCode()
+        result = 31 * result + hash.contentHashCode()
+        return result
+    }
+
+    override fun toString() = algorithm.id + ":" + encodedHash
 }
 
 internal fun String.toOciDigest(): OciDigest {
@@ -12,5 +58,13 @@ internal fun String.toOciDigest(): OciDigest {
     if (colonIndex == -1) {
         throw IllegalArgumentException("missing ':' in digest '$this'")
     }
-    return OciDigest(substring(0, colonIndex), substring(colonIndex + 1))
+    val algorithm = when (substring(0, colonIndex)) {
+        OciDigestAlgorithm.SHA_256.id -> OciDigestAlgorithm.SHA_256
+        OciDigestAlgorithm.SHA_512.id -> OciDigestAlgorithm.SHA_512
+        else -> throw IllegalArgumentException("unsupported algorithm in digest '$this'")
+    }
+    return OciDigest(algorithm, algorithm.decode(substring(colonIndex + 1)))
 }
+
+internal fun ByteArray.calculateOciDigest(algorithm: OciDigestAlgorithm) =
+    OciDigest(algorithm, algorithm.createMessageDigest().digest(this))

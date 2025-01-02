@@ -1,9 +1,11 @@
 [versions]
+commons-codec = "1.17.1"
 json = "20240303"
 junit-jupiter = "5.11.4"
 reactor-netty = "1.2.1"
 
 [libraries]
+commons-codec = { module = "commons-codec:commons-codec", version.ref = "commons-codec" }
 json = { module = "org.json:json", version.ref = "json" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
 reactor-netty = { module = "io.projectreactor.netty:reactor-netty", version.ref = "reactor-netty" }

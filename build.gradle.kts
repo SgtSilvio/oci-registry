@@ -42,6 +42,7 @@ repositories {
 dependencies {
     api(libs.reactor.netty)
     implementation(libs.json)
+    implementation(libs.commons.codec)
 }
 
 testing {
