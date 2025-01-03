@@ -1,5 +1,6 @@
 package io.github.sgtsilvio.oci.registry
 
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import kotlin.io.path.*
 
@@ -8,11 +9,11 @@ import kotlin.io.path.*
  */
 class DistributionRegistryStorage(private val directory: Path) : OciRegistryStorage() {
 
-    override fun getManifest(repositoryName: String, tag: String): Path? =
-        resolveManifestTagCurrentLinkFile(repositoryName, tag).getLinkedBlobFile()
+    override fun getManifest(repositoryName: String, tag: String): ByteArray? =
+        resolveManifestTagCurrentLinkFile(repositoryName, tag).getLinkedBlob()
 
-    override fun getManifest(repositoryName: String, digest: OciDigest): Path? =
-        resolveManifestLinkFile(repositoryName, digest).getLinkedBlobFile()
+    override fun getManifest(repositoryName: String, digest: OciDigest): ByteArray? =
+        resolveManifestLinkFile(repositoryName, digest).getLinkedBlob()
 
     override fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray) {
         val blobFile = resolveBlobFile(digest)
@@ -38,15 +39,30 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         resolveBlobLinkFile(repositoryName, digest).getLinkedBlobFile()
 
     private fun Path.getLinkedBlobFile(): Path? {
-        if (!exists()) {
+        val digest = try {
+            readText()
+        } catch (e: NoSuchFileException) {
             return null
-        }
-        val digest = readText().toOciDigest() // TODO handle IOException
+        }.toOciDigest()
         val blobFile = resolveBlobFile(digest)
         if (!blobFile.exists()) {
             return null
         }
         return blobFile
+    }
+
+    private fun Path.getLinkedBlob(): ByteArray? {
+        val digest = try {
+            readText()
+        } catch (e: NoSuchFileException) {
+            return null
+        }.toOciDigest()
+        val blobFile = resolveBlobFile(digest)
+        return try {
+            blobFile.readBytes()
+        } catch (e: NoSuchFileException) {
+            null
+        }
     }
 
     private fun resolveBlobFile(digest: OciDigest): Path {

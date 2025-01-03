@@ -14,7 +14,6 @@ import reactor.netty.http.server.HttpServerResponse
 import java.net.URI
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
-import kotlin.io.path.readBytes
 
 /*
 https://github.com/opencontainers/distribution-spec/blob/main/spec.md
@@ -146,7 +145,7 @@ class OciRegistryHandler(
         isGet: Boolean,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val manifestFile = if (':' in reference) {
+        val manifestBytes = if (':' in reference) {
             val digest = try {
                 reference.toOciDigest()
             } catch (e: IllegalArgumentException) {
@@ -156,7 +155,6 @@ class OciRegistryHandler(
         } else {
             storage.getManifest(repositoryName, reference)
         } ?: return response.sendNotFound()
-        val manifestBytes = manifestFile.readBytes()
         response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
         response.header(CONTENT_LENGTH, manifestBytes.size.toString())
         return if (isGet) response.sendByteArray(Mono.just(manifestBytes)) else response.send()

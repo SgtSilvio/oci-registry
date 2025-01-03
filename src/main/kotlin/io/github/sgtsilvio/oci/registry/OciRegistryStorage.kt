@@ -7,9 +7,9 @@ import java.nio.file.Path
  */
 sealed class OciRegistryStorage {
 
-    internal abstract fun getManifest(repositoryName: String, tag: String): Path?
+    internal abstract fun getManifest(repositoryName: String, tag: String): ByteArray?
 
-    internal abstract fun getManifest(repositoryName: String, digest: OciDigest): Path?
+    internal abstract fun getManifest(repositoryName: String, digest: OciDigest): ByteArray?
 
     internal abstract fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray)
 
