@@ -60,17 +60,17 @@ internal enum class StandardOciDigestAlgorithm(
 
     override fun validateHash(hash: ByteArray): ByteArray {
         if (hash.size != hashByteLength) {
-            throw IllegalArgumentException("hash has wrong length ${hash.size}, $hashAlgorithmName requires $hashByteLength")
+            throw IllegalArgumentException("digest hash has wrong length ${hash.size}, $hashAlgorithmName requires $hashByteLength")
         }
         return hash
     }
 
     override fun validateEncodedHash(encodedHash: String): String {
         if (encodedHash.length != (hashByteLength * 2)) {
-            throw IllegalArgumentException("encoded hash '$encodedHash' has wrong length ${encodedHash.length}, $hashAlgorithmName requires ${hashByteLength * 2}")
+            throw IllegalArgumentException("digest encoded hash '$encodedHash' has wrong length ${encodedHash.length}, $hashAlgorithmName requires ${hashByteLength * 2}")
         }
-        require(encodedHash.all { c -> ((c >= '0') && (c <= '9')) || ((c >= 'a') && (c <= 'f')) }) {
-            "digest encoded hash '$encodedHash' does not match [a-f0-9]"
+        if (!encodedHash.all { c -> ((c >= '0') && (c <= '9')) || ((c >= 'a') && (c <= 'f')) }) {
+            throw IllegalArgumentException("digest encoded hash '$encodedHash' does not match [a-f0-9]")
         }
         return encodedHash
     }
@@ -86,8 +86,8 @@ private val OCI_DIGEST_ENCODED_HASH_REGEX = Regex("[a-zA-Z0-9=_-]+")
 private class UnsupportedOciDigestAlgorithm(override val id: String) : OciDigestAlgorithm {
 
     init {
-        require(OCI_DIGEST_ALGORITHM_REGEX.matches(id)) {
-            "digest algorithm '$id' does not match $OCI_DIGEST_ALGORITHM_REGEX"
+        if (!OCI_DIGEST_ALGORITHM_REGEX.matches(id)) {
+            throw IllegalArgumentException("digest algorithm '$id' does not match $OCI_DIGEST_ALGORITHM_REGEX")
         }
     }
 
@@ -101,8 +101,8 @@ private class UnsupportedOciDigestAlgorithm(override val id: String) : OciDigest
     }
 
     override fun validateEncodedHash(encodedHash: String): String {
-        require(OCI_DIGEST_ENCODED_HASH_REGEX.matches(encodedHash)) {
-            "digest encoded hash '$encodedHash' does not match $OCI_DIGEST_ENCODED_HASH_REGEX"
+        if (!OCI_DIGEST_ENCODED_HASH_REGEX.matches(encodedHash)) {
+            throw IllegalArgumentException("digest encoded hash '$encodedHash' does not match $OCI_DIGEST_ENCODED_HASH_REGEX")
         }
         return encodedHash
     }
