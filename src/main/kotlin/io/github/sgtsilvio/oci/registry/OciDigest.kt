@@ -69,7 +69,9 @@ internal enum class StandardOciDigestAlgorithm(
         if (encodedHash.length != (hashByteLength * 2)) {
             throw IllegalArgumentException("encoded hash '$encodedHash' has wrong length ${encodedHash.length}, $hashAlgorithmName requires ${hashByteLength * 2}")
         }
-        // TODO check that all chars are [a-f0-9]
+        require(encodedHash.all { c -> ((c >= '0') && (c <= '9')) || ((c >= 'a') && (c <= 'f')) }) {
+            "digest encoded hash '$encodedHash' does not match [a-f0-9]"
+        }
         return encodedHash
     }
 
