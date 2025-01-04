@@ -436,6 +436,10 @@ class OciRegistryHandler(
     }
 }
 
-private val URI.queryParameters get() = query.split('&').associate { // TODO move to UriExtensions
-    Pair(it.substringBefore('='), it.substringAfter('=', ""))
-}
+private val URI.queryParameters: Map<String, String> // TODO move to UriExtensions
+    get() {
+        val query = query ?: return emptyMap()
+        return query.split('&').associate {
+            Pair(it.substringBefore('='), it.substringAfter('=', ""))
+        }
+    }
