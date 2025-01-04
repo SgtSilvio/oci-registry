@@ -19,6 +19,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.writeBytes
 import kotlin.io.path.writeText
 import kotlin.random.Random
+import kotlin.random.nextUInt
 
 /**
  * @author Silvio Giebl
@@ -56,14 +57,14 @@ class OciRegistryTest {
     }
 
     private inner class ManifestByTagData {
-        val repository = "example/repository-" + Random.nextInt()
-        val tag = "tag-" + Random.nextInt()
-        val mediaType = "mediaType-" + Random.nextInt()
+        val repository = "example/repository-" + Random.nextUInt()
+        val tag = "tag-" + Random.nextUInt()
+        val mediaType = "mediaType-" + Random.nextUInt()
         val manifest = """{"mediaType":"$mediaType"}"""
 
         init {
-            val digestAlgorithm = "alg-" + Random.nextInt()
-            val digestHash = "hash-" + Random.nextInt()
+            val digestAlgorithm = "alg-" + Random.nextUInt()
+            val digestHash = "hash-" + Random.nextUInt()
             storageDir.resolve("blobs/$digestAlgorithm/${digestHash.substring(0, 2)}/$digestHash")
                 .createDirectories()
                 .resolve("data")
@@ -110,10 +111,10 @@ class OciRegistryTest {
     }
 
     private inner class ManifestByDigestData {
-        val repository = "example/repository-" + Random.nextInt()
-        val digestAlgorithm = "alg-" + Random.nextInt()
-        val digestHash = "hash-" + Random.nextInt()
-        val mediaType = "mediaType-" + Random.nextInt()
+        val repository = "example/repository-" + Random.nextUInt()
+        val digestAlgorithm = "alg-" + Random.nextUInt()
+        val digestHash = "hash-" + Random.nextUInt()
+        val mediaType = "mediaType-" + Random.nextUInt()
         val manifest = """{"mediaType":"$mediaType"}"""
 
         init {
@@ -179,9 +180,9 @@ class OciRegistryTest {
     }
 
     private inner class BlobData {
-        val repository = "example/repository-" + Random.nextInt()
-        val digestAlgorithm = "alg-" + Random.nextInt()
-        val digestHash = "hash-" + Random.nextInt()
+        val repository = "example/repository-" + Random.nextUInt()
+        val digestAlgorithm = "alg-" + Random.nextUInt()
+        val digestHash = "hash-" + Random.nextUInt()
         val blob = ByteArray(256) { it.toByte() }
 
         init {

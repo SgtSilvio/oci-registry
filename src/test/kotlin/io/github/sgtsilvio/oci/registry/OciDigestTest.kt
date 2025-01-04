@@ -10,21 +10,21 @@ import org.junit.jupiter.api.assertThrows
 class OciDigestTest {
 
     @Test
-    fun toOciDigest() {
+    fun stringToOciDigest() {
         val digest = "sha256:0123456789012345678901234567890123456789012345678901234567890123".toOciDigest()
-        assertEquals("sha256", digest.algorithm)
-        assertEquals("0123456789012345678901234567890123456789012345678901234567890123", digest.hash)
+        assertEquals(StandardOciDigestAlgorithm.SHA_256, digest.algorithm)
+        assertEquals("0123456789012345678901234567890123456789012345678901234567890123", digest.encodedHash)
     }
 
     @Test
-    fun toOciDigest_unknownAlgorithm() {
+    fun stringToOciDigest_unknownAlgorithm() {
         val digest = "foo+bar.wab_47-11:abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789=".toOciDigest()
-        assertEquals("foo+bar.wab_47-11", digest.algorithm)
-        assertEquals("abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789=", digest.hash)
+        assertEquals("foo+bar.wab_47-11", digest.algorithm.id)
+        assertEquals("abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789=", digest.encodedHash)
     }
 
     @Test
-    fun toOciDigest_withoutColon_throws() {
+    fun stringToOciDigest_withoutColon_throws() {
         assertThrows<IllegalArgumentException> {
             "sha256-0123456789012345678901234567890123456789012345678901234567890123".toOciDigest()
         }

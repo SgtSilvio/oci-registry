@@ -193,7 +193,11 @@ class OciRegistryHandler(
         data: ByteArray,
         response: HttpServerResponse,
     ): Mono<Void> {
-        val actualDigest = data.calculateOciDigest(digest?.algorithm ?: OciDigestAlgorithm.SHA_256)
+        val actualDigest = try {
+            data.calculateOciDigest(digest?.algorithm ?: StandardOciDigestAlgorithm.SHA_256)
+        } catch (e: UnsupportedOperationException) {
+            return response.sendBadRequest()
+        }
         if ((digest != null) && (digest != actualDigest)) {
             return response.sendBadRequest()
         }
