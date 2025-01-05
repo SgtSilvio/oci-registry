@@ -1,5 +1,6 @@
 package io.github.sgtsilvio.oci.registry
 
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -10,29 +11,22 @@ import kotlin.io.path.*
 class DistributionRegistryStorage(private val directory: Path) : OciRegistryStorage() {
 
     override fun getManifest(repositoryName: String, tag: String): ByteArray? =
-        resolveManifestTagCurrentLinkFile(repositoryName, tag).getLinkedBlob()
+        resolveManifestTagCurrentLinkFile(repositoryName, tag).readLinkedBlob()
 
     override fun getManifest(repositoryName: String, digest: OciDigest): ByteArray? =
-        resolveManifestLinkFile(repositoryName, digest).getLinkedBlob()
+        resolveManifestLinkFile(repositoryName, digest).readLinkedBlob()
 
     override fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray) {
-        val blobFile = resolveBlobFile(digest)
-        if (!blobFile.exists()) {
-            blobFile.createParentDirectories().writeBytes(data) // TODO write to tmp file and move for atomicity
-        }
-        val linkFile = resolveManifestLinkFile(repositoryName, digest)
-        if (!linkFile.exists()) {
-            linkFile.createParentDirectories().writeText(digest.toString()) // TODO write to tmp file and move for atomicity
-        }
+        resolveBlobFile(digest).createParentDirectories().writeAtomicallyIfNotExists { it.writeBytes(data) }
+        resolveManifestLinkFile(repositoryName, digest).createParentDirectories()
+            .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
     }
 
     override fun tagManifest(repositoryName: String, digest: OciDigest, tag: String) {
-        val currentLinkFile = resolveManifestTagCurrentLinkFile(repositoryName, tag)
-        currentLinkFile.createParentDirectories().writeText(digest.toString()) // TODO write to tmp file and move for atomicity
-        val indexLinkFile = resolveManifestTagIndexLinkFile(repositoryName, tag, digest)
-        if (!indexLinkFile.exists()) {
-            indexLinkFile.createParentDirectories().writeText(digest.toString()) // TODO write to tmp file and move for atomicity
-        }
+        resolveManifestTagCurrentLinkFile(repositoryName, tag).createParentDirectories()
+            .writeAtomically { it.writeText(digest.toString()) }
+        resolveManifestTagIndexLinkFile(repositoryName, tag, digest).createParentDirectories()
+            .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
     }
 
     override fun getBlob(repositoryName: String, digest: OciDigest): Path? =
@@ -51,7 +45,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return blobFile
     }
 
-    private fun Path.getLinkedBlob(): ByteArray? {
+    private fun Path.readLinkedBlob(): ByteArray? {
         val digest = try {
             readText()
         } catch (e: NoSuchFileException) {
@@ -94,4 +88,33 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
 
     private fun Path.resolveLinkFile(digest: OciDigest): Path =
         resolve(digest.algorithm.id).resolve(digest.encodedHash).resolve("link")
+
+    private fun Path.createParentDirectories(): Path {
+        parent?.createDirectories()
+        return this
+    }
+
+    private inline fun Path.writeAtomically(writeOperation: (Path) -> Unit) {
+        val tempFile = createTempFile(parent, name)
+        try {
+            writeOperation(tempFile)
+            tempFile.moveTo(this, true)
+        } finally {
+            tempFile.deleteIfExists()
+        }
+    }
+
+    private inline fun Path.writeAtomicallyIfNotExists(writeOperation: (Path) -> Unit) {
+        if (exists()) return
+        val tempFile = createTempFile(parent, name)
+        try {
+            writeOperation(tempFile)
+            try {
+                tempFile.moveTo(this)
+            } catch (ignored: FileAlreadyExistsException) {
+            }
+        } finally {
+            tempFile.deleteIfExists()
+        }
+    }
 }
