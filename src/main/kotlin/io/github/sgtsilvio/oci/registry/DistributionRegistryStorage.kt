@@ -4,11 +4,9 @@ import reactor.core.publisher.Mono
 import reactor.netty.ByteBufFlux
 import java.io.IOException
 import java.nio.channels.FileChannel
-import java.nio.file.FileAlreadyExistsException
-import java.nio.file.NoSuchFileException
-import java.nio.file.Path
-import java.nio.file.StandardOpenOption
+import java.nio.file.*
 import java.util.*
+import kotlin.NoSuchElementException
 import kotlin.io.path.*
 
 /**
@@ -54,7 +52,13 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
 
     override fun writeBlobUpload(repositoryName: String, id: String, data: ByteBufFlux, offset: Long): Mono<Long> =
         Mono.using(
-            { FileChannel.open(resolveBlobUploadDataFile(repositoryName, id), StandardOpenOption.WRITE) },
+            {
+                try {
+                    FileChannel.open(resolveBlobUploadDataFile(repositoryName, id), StandardOpenOption.WRITE)
+                } catch (e: IOException) {
+                    throw NoSuchElementException()
+                }
+            },
             { fileChannel ->
                 data.scan(offset) { position, byteBuf ->
                     val length = byteBuf.readableBytes()
@@ -65,18 +69,26 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             { fileChannel -> fileChannel.close() },
         )
 
-    override fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest) {
+    override fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest): Boolean {
         val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
+        if (!blobUploadDataFile.exists()) return false
         val blobFile = resolveBlobFile(digest).createParentDirectories()
         try {
-            blobUploadDataFile.moveTo(blobFile)
-        } catch (ignored: FileAlreadyExistsException) {
+            if (!blobFile.exists()) {
+                try {
+                    blobUploadDataFile.moveTo(blobFile)
+                } catch (e: IOException) {
+                    if ((e is NoSuchFileException) || !blobUploadDataFile.exists()) return false
+                    if ((e !is FileAlreadyExistsException) && !blobFile.exists()) throw e
+                }
+            }
         } finally {
             blobUploadDataFile.deleteIfExists()
             blobUploadDataFile.parent.deleteExisting()
         }
         resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
             .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
+        return true
     }
 
     private fun Path.getLinkedBlobFile(): Path? {
@@ -161,7 +173,8 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             writeOperation(tempFile)
             try {
                 tempFile.moveTo(this)
-            } catch (ignored: FileAlreadyExistsException) {
+            } catch (e: IOException) {
+                if ((e !is FileAlreadyExistsException) && !exists()) throw e
             }
         } finally {
             tempFile.deleteIfExists()

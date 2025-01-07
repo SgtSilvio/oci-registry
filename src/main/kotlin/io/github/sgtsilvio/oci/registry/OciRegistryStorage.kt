@@ -30,5 +30,5 @@ sealed class OciRegistryStorage {
         offset: Long,
     ): Mono<Long>
 
-    internal abstract fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest)
+    internal abstract fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest): Boolean
 }
