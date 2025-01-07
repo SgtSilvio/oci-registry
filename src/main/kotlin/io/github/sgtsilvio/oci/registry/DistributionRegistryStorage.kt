@@ -40,43 +40,41 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
 
     override fun createBlobUpload(repositoryName: String): String {
         val id = UUID.randomUUID().toString()
-        val blobUploadDirectory = resolveBlobUploadDirectory(repositoryName, id).createDirectories()
-        blobUploadDirectory.resolve("data").createFile()
+        resolveBlobUploadDataFile(repositoryName, id).createParentDirectories().createFile()
         return id
     }
 
     override fun getBlobUploadSize(repositoryName: String, id: String): Long? {
         return try {
-            resolveBlobUploadDirectory(repositoryName, id).resolve("data").fileSize()
+            resolveBlobUploadDataFile(repositoryName, id).fileSize()
         } catch (e: IOException) {
             null
         }
     }
 
     override fun writeBlobUpload(repositoryName: String, id: String, data: ByteBufFlux, offset: Long): Mono<Long> =
-        Mono.defer {
-            val fileChannel = FileChannel.open(
-                resolveBlobUploadDirectory(repositoryName, id).resolve("data"),
-                StandardOpenOption.WRITE,
-            )
-            data.scan(offset) { position, byteBuf ->
-                val length = byteBuf.readableBytes()
-                byteBuf.readBytes(fileChannel, position, length)
-                position + length
-            }.last().doFinally { fileChannel.close() }
-        }
+        Mono.using(
+            { FileChannel.open(resolveBlobUploadDataFile(repositoryName, id), StandardOpenOption.WRITE) },
+            { fileChannel ->
+                data.scan(offset) { position, byteBuf ->
+                    val length = byteBuf.readableBytes()
+                    byteBuf.readBytes(fileChannel, position, length)
+                    position + length
+                }.last()
+            },
+            { fileChannel -> fileChannel.close() },
+        )
 
     override fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest) {
-        val blobUploadDirectory = resolveBlobUploadDirectory(repositoryName, id)
-        val blobUploadDataFile = blobUploadDirectory.resolve("data")
+        val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
         val blobFile = resolveBlobFile(digest).createParentDirectories()
         try {
             blobUploadDataFile.moveTo(blobFile)
         } catch (ignored: FileAlreadyExistsException) {
         } finally {
             blobUploadDataFile.deleteIfExists()
+            blobUploadDataFile.parent.deleteExisting()
         }
-        blobUploadDirectory.deleteExisting()
         resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
             .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
     }
@@ -138,8 +136,8 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     private fun Path.resolveLinkFile(digest: OciDigest): Path =
         resolve(digest.algorithm.id).resolve(digest.encodedHash).resolve("link")
 
-    private fun resolveBlobUploadDirectory(repositoryName: String, id: String): Path =
-        resolveRepositoryDirectory(repositoryName).resolve("_uploads").resolve(id)
+    private fun resolveBlobUploadDataFile(repositoryName: String, id: String): Path =
+        resolveRepositoryDirectory(repositoryName).resolve("_uploads").resolve(id).resolve("data")
 
     private fun Path.createParentDirectories(): Path { // TODO move to PathExtensions?
         parent?.createDirectories()
