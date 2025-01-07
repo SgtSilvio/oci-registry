@@ -296,7 +296,7 @@ class OciRegistryHandler(
         }
 
         else -> when (request.method()) {
-            GET, HEAD -> getOrHeadBlobUpload(repositoryName, id, request, response)
+            GET, HEAD -> getOrHeadBlobUpload(repositoryName, id, response)
             PATCH -> patchBlobUpload(repositoryName, id, request, response)
             PUT -> putBlobUpload(repositoryName, id, request, response)
             DELETE -> response.status(METHOD_NOT_ALLOWED).send()
@@ -333,15 +333,18 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
+//        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
         if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
             return response.sendBadRequest()
         }
-//        request headers:
-//            Content-Length: <length>
-//        response.status(CREATED)
-//        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-//        request.receive()
-        return response.status(METHOD_NOT_ALLOWED).send()
+        val id = storage.createBlobUpload(repositoryName)
+        return storage.writeBlobUpload(repositoryName, id, request.receive(), 0).flatMap {
+            // TODO cleanup blob upload on failure
+            // TODO validate digest
+            storage.finishBlobUpload(repositoryName, id, digest)
+            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+            response.status(CREATED).send()
+        }
     }
 
     private fun mountBlob(
@@ -350,7 +353,7 @@ class OciRegistryHandler(
         fromRepositoryName: String,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val digest = try { // TODO move to mountBlob?
+        val digest = try {
             rawDigest.toOciDigest()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
@@ -358,27 +361,21 @@ class OciRegistryHandler(
 //        response.status(CREATED)
 //        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
 //        fall back to createBlobUpload when blob is not found
-        return response.status(METHOD_NOT_ALLOWED).send()
+        // TODO
+        return createBlobUpload(repositoryName, response)
     }
 
     private fun createBlobUpload(repositoryName: String, response: HttpServerResponse): Publisher<Void> {
-//        request headers for chunked upload:
-//            Content-Length: 0
-//        response.status(ACCEPTED)
-//        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
-        return response.status(METHOD_NOT_ALLOWED).send()
+        val id = storage.createBlobUpload(repositoryName)
+        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
+        return response.status(ACCEPTED).send()
     }
 
-    private fun getOrHeadBlobUpload(
-        repositoryName: String,
-        id: String,
-        request: HttpServerRequest,
-        response: HttpServerResponse,
-    ): Publisher<Void> {
-//        response.status(NO_CONTENT) // or 404
-//        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
-//        response.header(RANGE, "0-$endOfRange")
-        return response.status(METHOD_NOT_ALLOWED).send()
+    private fun getOrHeadBlobUpload(repositoryName: String, id: String, response: HttpServerResponse): Publisher<Void> {
+        val size = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
+        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
+        response.header(RANGE, "0-${size - 1}")
+        return response.status(NO_CONTENT).send()
     }
 
     private fun patchBlobUpload(
@@ -387,20 +384,28 @@ class OciRegistryHandler(
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
+//        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
+        val contentRange = try {
+            // content-range header is required in spec, but docker sends PATCH without range
+            request.requestHeaders()[CONTENT_RANGE]?.decodeRange()
+        } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
         if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
             return response.sendBadRequest()
         }
-        val contentRangeHeader = request.requestHeaders()[CONTENT_RANGE] ?: return response.sendBadRequest()
-//        request headers:
-//            Content-Length: <length of chunk>
-//        response.status(ACCEPTED) // or 416 range not satisfiable, or 404
-//        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
-//        response.header(RANGE, "0-$endOfRange")
-//        request.receive()
-//        Chunks MUST be uploaded in order, with the first byte of a chunk being the last chunk's <end-of-range> plus one.
-//        If a chunk is uploaded out of order, the registry MUST respond with a 416 Requested Range Not Satisfiable code.
-//        A GET request may be used to retrieve the current valid offset and upload location.
-        return response.status(METHOD_NOT_ALLOWED).send()
+        val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
+        val offset = if (contentRange == null) 0 else {
+            if (contentRange.first != currentSize) {
+                return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
+            }
+            currentSize
+        }
+        return storage.writeBlobUpload(repositoryName, id, request.receive(), offset).flatMap { size ->
+            response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
+            response.header(RANGE, "0-${size - 1}")
+            response.status(ACCEPTED).send()
+        }
     }
 
     private fun putBlobUpload(
@@ -416,23 +421,35 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        val contentRangeHeader = request.requestHeaders()[CONTENT_RANGE]
-        if (contentRangeHeader != null) {
+//        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
+        val contentRange = try {
+            request.requestHeaders()[CONTENT_RANGE]?.decodeRange()
+        } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        val offset = if (contentRange == null) 0 else {
             if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
                 return response.sendBadRequest()
             }
+            val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
+            if (contentRange.first != currentSize) {
+                return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
+            }
+            currentSize
+        }
 //            request headers for chunked upload with last chunk:
 //                Content-Length: <length of chunk>
-        } else {
 //            request headers for monolithic upload:
 //                Content-Type: application/octet-stream
 //                Content-Length: <length>
 //            no request headers for chunked upload without last chunk
+        return storage.writeBlobUpload(repositoryName, id, request.receive(), offset).flatMap {
+            // TODO cleanup blob upload on failure
+            // TODO validate digest
+            storage.finishBlobUpload(repositoryName, id, digest)
+            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+            response.status(CREATED).send()
         }
-//        response.status(CREATED) // or 416 range not satisfiable, or 404
-//        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-//        request.receive()
-        return response.status(METHOD_NOT_ALLOWED).send()
     }
 }
 
@@ -443,3 +460,16 @@ private val URI.queryParameters: Map<String, String> // TODO move to UriExtensio
             Pair(it.substringBefore('='), it.substringAfter('=', ""))
         }
     }
+
+private fun String.decodeRange(): HttpRange { // TODO placement
+    val parts = split('-')
+    if (parts.size != 2) {
+        throw IllegalArgumentException("\"$this\" is not a valid range, it must contain exactly 1 '-' character.")
+    }
+    val first = parts[0].toLong()
+    val last = parts[0].toLong()
+    if (last < first) {
+        throw IllegalArgumentException("\"$this\" is not a valid range, last position must not be less than first position.")
+    }
+    return HttpRange(first, last)
+}

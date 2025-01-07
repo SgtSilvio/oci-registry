@@ -1,5 +1,7 @@
 package io.github.sgtsilvio.oci.registry
 
+import reactor.core.publisher.Mono
+import reactor.netty.ByteBufFlux
 import java.nio.file.Path
 
 /**
@@ -15,5 +17,18 @@ sealed class OciRegistryStorage {
 
     internal abstract fun tagManifest(repositoryName: String, digest: OciDigest, tag: String)
 
-    internal abstract fun getBlob(repositoryName: String, digest: OciDigest): Path?
+    internal abstract fun getBlob(repositoryName: String, digest: OciDigest): Path? // TODO return Flux<ByteArray> or ByteBufFlux, error if not found?
+
+    internal abstract fun createBlobUpload(repositoryName: String): String
+
+    internal abstract fun getBlobUploadSize(repositoryName: String, id: String): Long?
+
+    internal abstract fun writeBlobUpload(
+        repositoryName: String,
+        id: String,
+        data: ByteBufFlux,
+        offset: Long,
+    ): Mono<Long>
+
+    internal abstract fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest)
 }
