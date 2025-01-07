@@ -179,9 +179,9 @@ class OciRegistryHandler(
             digest = null
             tag = reference
         }
-        val contentTypeHeader = request.requestHeaders()[CONTENT_TYPE]
+        val contentType = request.requestHeaders()[CONTENT_TYPE]
         return request.receive().aggregate().asByteArray().flatMap { data ->
-            putManifest(repositoryName, digest, tag, contentTypeHeader, data, response)
+            putManifest(repositoryName, digest, tag, contentType, data, response)
         }
     }
 
@@ -336,7 +336,8 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
 //        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
-        if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
+        val contentType = request.requestHeaders()[CONTENT_TYPE]
+        if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
         val id = storage.createBlobUpload(repositoryName)
@@ -393,7 +394,8 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
+        val contentType = request.requestHeaders()[CONTENT_TYPE]
+        if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
         val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
@@ -429,22 +431,17 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
+        val contentType = request.requestHeaders()[CONTENT_TYPE]
+        if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
+            return response.sendBadRequest()
+        }
         val offset = if (contentRange == null) 0 else {
-            if (request.requestHeaders()[CONTENT_TYPE] != APPLICATION_OCTET_STREAM.toString()) {
-                return response.sendBadRequest()
-            }
             val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
             if (contentRange.first != currentSize) {
                 return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
             }
             currentSize
         }
-//            request headers for chunked upload with last chunk:
-//                Content-Length: <length of chunk>
-//            request headers for monolithic upload:
-//                Content-Type: application/octet-stream
-//                Content-Length: <length>
-//            no request headers for chunked upload without last chunk
         return storage.writeBlobUpload(repositoryName, id, request.receive(), offset).flatMap {
             // TODO cleanup blob upload on failure
             // TODO validate digest
