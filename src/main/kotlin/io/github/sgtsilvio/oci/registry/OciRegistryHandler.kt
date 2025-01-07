@@ -218,11 +218,13 @@ class OciRegistryHandler(
 //            OCI_IMAGE_MANIFEST_MEDIA_TYPE, DOCKER_MANIFEST_MEDIA_TYPE -> // TODO validate blob presence in config.digest and layers[].digest (size?)
 //            else -> return response.sendBadRequest()
 //        }
+        // TODO validate manifests json structure ignoring additional fields
         storage.putManifest(repositoryName, actualDigest, data)
         if (tag != null) {
             storage.tagManifest(repositoryName, actualDigest, tag)
         }
         response.header(LOCATION, "/v2/$repositoryName/manifests/${tag ?: actualDigest}")
+        response.header("docker-content-digest", actualDigest.toString())
         return response.status(CREATED).send()
     }
 
