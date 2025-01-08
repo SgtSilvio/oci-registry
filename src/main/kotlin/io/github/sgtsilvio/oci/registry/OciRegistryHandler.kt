@@ -361,11 +361,12 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-//        response.status(CREATED)
-//        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-//        fall back to createBlobUpload when blob is not found
-        // TODO
-        return createBlobUpload(repositoryName, response)
+        return if (storage.mountBlob(repositoryName, digest, fromRepositoryName)) {
+            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+            response.status(CREATED).send()
+        } else {
+            createBlobUpload(repositoryName, response)
+        }
     }
 
     private fun createBlobUpload(repositoryName: String, response: HttpServerResponse): Publisher<Void> {

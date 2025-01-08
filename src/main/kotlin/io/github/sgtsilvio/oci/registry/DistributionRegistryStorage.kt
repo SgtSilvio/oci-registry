@@ -36,6 +36,21 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     override fun getBlob(repositoryName: String, digest: OciDigest): Path? =
         resolveBlobLinkFile(repositoryName, digest).getLinkedBlobFile()
 
+    override fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String): Boolean {
+        val fromBlobLinkFile = resolveBlobLinkFile(fromRepositoryName, digest)
+        val blobDigest = try {
+            fromBlobLinkFile.readText()
+        } catch (e: NoSuchFileException) { // TODO is this exception guaranteed? use IOException?
+            return false
+        }.toOciDigest()
+        if (!resolveBlobFile(digest).exists()) {
+            return false
+        }
+        resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
+            .writeAtomicallyIfNotExists { it.writeText(blobDigest.toString()) }
+        return true
+    }
+
     override fun createBlobUpload(repositoryName: String): String {
         val id = UUID.randomUUID().toString()
         resolveBlobUploadDataFile(repositoryName, id).createParentDirectories().createFile()
