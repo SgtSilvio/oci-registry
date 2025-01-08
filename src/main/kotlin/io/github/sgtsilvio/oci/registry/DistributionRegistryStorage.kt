@@ -37,13 +37,12 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         resolveBlobLinkFile(repositoryName, digest).getLinkedBlobFile()
 
     override fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String): Boolean {
-        val fromBlobLinkFile = resolveBlobLinkFile(fromRepositoryName, digest)
         val blobDigest = try {
-            fromBlobLinkFile.readText()
-        } catch (e: NoSuchFileException) { // TODO is this exception guaranteed? use IOException?
+            resolveBlobLinkFile(fromRepositoryName, digest).readText()
+        } catch (e: IOException) {
             return false
         }.toOciDigest()
-        if (!resolveBlobFile(digest).exists()) {
+        if (!resolveBlobFile(blobDigest).exists()) {
             return false
         }
         resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
@@ -109,7 +108,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     private fun Path.getLinkedBlobFile(): Path? {
         val digest = try {
             readText()
-        } catch (e: NoSuchFileException) {
+        } catch (e: IOException) {
             return null
         }.toOciDigest()
         val blobFile = resolveBlobFile(digest)
@@ -122,13 +121,12 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     private fun Path.readLinkedBlob(): ByteArray? {
         val digest = try {
             readText()
-        } catch (e: NoSuchFileException) {
+        } catch (e: IOException) {
             return null
         }.toOciDigest()
-        val blobFile = resolveBlobFile(digest)
         return try {
-            blobFile.readBytes()
-        } catch (e: NoSuchFileException) {
+            resolveBlobFile(digest).readBytes()
+        } catch (e: IOException) {
             null
         }
     }
