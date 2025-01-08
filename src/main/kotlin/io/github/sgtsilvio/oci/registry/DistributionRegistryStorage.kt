@@ -105,13 +105,17 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return true
     }
 
-    private fun Path.getLinkedBlobFile(): Path? {
+    private fun Path.resolveLinkedBlobFile(): Path? {
         val digest = try {
             readText()
         } catch (e: IOException) {
             return null
         }.toOciDigest()
-        val blobFile = resolveBlobFile(digest)
+        return resolveBlobFile(digest)
+    }
+
+    private fun Path.getLinkedBlobFile(): Path? {
+        val blobFile = resolveLinkedBlobFile() ?: return null
         if (!blobFile.exists()) { // TODO
             return null
         }
@@ -119,13 +123,9 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     }
 
     private fun Path.readLinkedBlob(): ByteArray? {
-        val digest = try {
-            readText()
-        } catch (e: IOException) {
-            return null
-        }.toOciDigest()
+        val blobFile = resolveLinkedBlobFile() ?: return null
         return try {
-            resolveBlobFile(digest).readBytes()
+            blobFile.readBytes()
         } catch (e: IOException) {
             null
         }
