@@ -33,8 +33,13 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
     }
 
-    override fun getBlob(repositoryName: String, digest: OciDigest): Path? =
-        resolveBlobLinkFile(repositoryName, digest).getLinkedBlobFile()
+    override fun getBlob(repositoryName: String, digest: OciDigest): Path? {
+        val blobFile = resolveBlobLinkFile(repositoryName, digest).resolveLinkedBlobFile() ?: return null
+        if (!blobFile.exists()) { // TODO
+            return null
+        }
+        return blobFile
+    }
 
     override fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String): Boolean {
         val blobDigest = try {
@@ -105,32 +110,6 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return true
     }
 
-    private fun Path.resolveLinkedBlobFile(): Path? {
-        val digest = try {
-            readText()
-        } catch (e: IOException) {
-            return null
-        }.toOciDigest()
-        return resolveBlobFile(digest)
-    }
-
-    private fun Path.getLinkedBlobFile(): Path? {
-        val blobFile = resolveLinkedBlobFile() ?: return null
-        if (!blobFile.exists()) { // TODO
-            return null
-        }
-        return blobFile
-    }
-
-    private fun Path.readLinkedBlob(): ByteArray? {
-        val blobFile = resolveLinkedBlobFile() ?: return null
-        return try {
-            blobFile.readBytes()
-        } catch (e: IOException) {
-            null
-        }
-    }
-
     private fun resolveBlobFile(digest: OciDigest): Path {
         val encodedHash = digest.encodedHash
         return directory.resolve("blobs")
@@ -160,6 +139,24 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
 
     private fun Path.resolveLinkFile(digest: OciDigest): Path =
         resolve(digest.algorithm.id).resolve(digest.encodedHash).resolve("link")
+
+    private fun Path.resolveLinkedBlobFile(): Path? {
+        val digest = try {
+            readText()
+        } catch (e: IOException) {
+            return null
+        }.toOciDigest()
+        return resolveBlobFile(digest)
+    }
+
+    private fun Path.readLinkedBlob(): ByteArray? {
+        val blobFile = resolveLinkedBlobFile() ?: return null
+        return try {
+            blobFile.readBytes()
+        } catch (e: IOException) {
+            null
+        }
+    }
 
     private fun resolveBlobUploadDataFile(repositoryName: String, id: String): Path =
         resolveRepositoryDirectory(repositoryName).resolve("_uploads").resolve(id).resolve("data")
