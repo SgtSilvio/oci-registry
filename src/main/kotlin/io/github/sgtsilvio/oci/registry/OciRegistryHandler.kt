@@ -388,14 +388,15 @@ class OciRegistryHandler(
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
-//        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
+        val requestHeaders = request.requestHeaders()
+//        val contentLengthHeader = requestHeaders[CONTENT_LENGTH]
         val contentRange = try {
             // content-range header is required in spec, but docker sends PATCH without range
-            request.requestHeaders()[CONTENT_RANGE]?.decodeRange()
+            requestHeaders[CONTENT_RANGE]?.decodeRange()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        val contentType = request.requestHeaders()[CONTENT_TYPE]
+        val contentType = requestHeaders[CONTENT_TYPE]
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
@@ -426,13 +427,14 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-//        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
+        val requestHeaders = request.requestHeaders()
+//        val contentLengthHeader = requestHeaders[CONTENT_LENGTH]
         val contentRange = try {
-            request.requestHeaders()[CONTENT_RANGE]?.decodeRange()
+            requestHeaders[CONTENT_RANGE]?.decodeRange()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        val contentType = request.requestHeaders()[CONTENT_TYPE]
+        val contentType = requestHeaders[CONTENT_TYPE]
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
