@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono
 import reactor.netty.http.server.HttpServerRequest
 import reactor.netty.http.server.HttpServerResponse
 import java.net.URI
+import java.security.DigestException
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
 
@@ -403,10 +404,15 @@ class OciRegistryHandler(
             }
             currentSize
         }
-        return storage.progressBlobUpload(repositoryName, id, request.receive(), offset).flatMap { size -> // TODO handle error
+        return storage.progressBlobUpload(repositoryName, id, request.receive(), offset).flatMap { size ->
             response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
             response.header(RANGE, "0-${size - 1}")
             response.status(ACCEPTED).send()
+        }.onErrorResume { error ->
+            when (error) {
+                is NoSuchElementException -> response.sendNotFound()
+                else -> throw error
+            }
         }
     }
 
@@ -451,10 +457,16 @@ class OciRegistryHandler(
         offset: Long,
         digest: OciDigest,
         response: HttpServerResponse,
-    ): Publisher<Void> = storage.finishBlobUpload(repositoryName, id, data, offset, digest).flatMap { // TODO handle error
+    ): Publisher<Void> = storage.finishBlobUpload(repositoryName, id, data, offset, digest).flatMap {
         // TODO cleanup blob upload on failure
         response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
         response.status(CREATED).send()
+    }.onErrorResume { error ->
+        when (error) {
+            is NoSuchElementException -> response.sendNotFound()
+            is DigestException -> response.sendBadRequest()
+            else -> throw error
+        }
     }
 }
 
