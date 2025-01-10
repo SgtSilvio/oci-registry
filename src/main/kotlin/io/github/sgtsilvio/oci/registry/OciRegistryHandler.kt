@@ -325,6 +325,25 @@ class OciRegistryHandler(
         return createBlobUpload(repositoryName, response)
     }
 
+    private fun mountBlob(
+        repositoryName: String,
+        rawDigest: String,
+        fromRepositoryName: String,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val digest = try {
+            rawDigest.toOciDigest()
+        } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        return if (storage.mountBlob(repositoryName, digest, fromRepositoryName)) {
+            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+            response.status(CREATED).send()
+        } else {
+            createBlobUpload(repositoryName, response)
+        }
+    }
+
     private fun putBlob(
         repositoryName: String,
         rawDigest: String,
@@ -350,25 +369,6 @@ class OciRegistryHandler(
                 is DigestException -> response.sendBadRequest()
                 else -> throw error
             }
-        }
-    }
-
-    private fun mountBlob(
-        repositoryName: String,
-        rawDigest: String,
-        fromRepositoryName: String,
-        response: HttpServerResponse,
-    ): Publisher<Void> {
-        val digest = try {
-            rawDigest.toOciDigest()
-        } catch (e: IllegalArgumentException) {
-            return response.sendBadRequest()
-        }
-        return if (storage.mountBlob(repositoryName, digest, fromRepositoryName)) {
-            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-            response.status(CREATED).send()
-        } else {
-            createBlobUpload(repositoryName, response)
         }
     }
 
