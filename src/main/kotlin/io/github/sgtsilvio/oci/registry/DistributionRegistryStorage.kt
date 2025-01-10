@@ -7,7 +7,6 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.FileAlreadyExistsException
-import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.security.DigestException
@@ -85,13 +84,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
                     throw NoSuchElementException()
                 }
             },
-            { fileChannel ->
-                data.scan(offset) { position, byteBuf ->
-                    val length = byteBuf.readableBytes()
-                    byteBuf.readBytes(fileChannel, position, length)
-                    position + length
-                }.last()
-            },
+            { fileChannel -> fileChannel.write(data, offset) },
         )
 
     // TODO exclusive access for writing, try lock else respond 416 range not satisfiable
@@ -104,77 +97,72 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         digest: OciDigest
     ): Mono<OciDigest> {
         val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
-        return Mono.defer {
-            val messageDigest = if (offset == 0L) {
-                digest.algorithm.createMessageDigest()
-            } else {
-                blobUploadDataFile.getMessageDigest(offset, digest.algorithm) // TODO handle IOException
-            }
-            progressBlobUpload(
-                repositoryName,
-                id,
-                data.doOnNext { byteBuf -> messageDigest.update(byteBuf.nioBuffer()) },
-                offset,
-            ).map { written ->
-                val hash = if (written == blobUploadDataFile.fileSize()) { // TODO handle IOException
-                    messageDigest
-                } else {
-                    blobUploadDataFile.getMessageDigest(Long.MAX_VALUE, digest.algorithm) // TODO handle IOException
-                }.digest()
-                OciDigest(digest.algorithm, hash)
-            }
-        }.doOnNext { actualDigest ->
-            if (digest != actualDigest) {
-                throw DigestException()
-            }
-            commitBlobUpload(repositoryName, id, digest)
-        }
-    }
-
-    private fun Path.getMessageDigest(size: Long, digestAlgorithm: OciDigestAlgorithm): MessageDigest {
-        FileChannel.open(this, StandardOpenOption.READ).use { fileChannel ->
-            val messageDigest = digestAlgorithm.createMessageDigest()
-            val bufferCapacity = 8192
-            val buffer = ByteBuffer.allocate(bufferCapacity)
-            var remaining = size
-            while (remaining > 0) {
-                buffer.position(0)
-                buffer.limit(min(remaining, bufferCapacity.toLong()).toInt())
-                val read = fileChannel.read(buffer)
-                if (read == -1) {
-                    if (size == Long.MAX_VALUE) {
-                        return messageDigest
-                    }
-                    throw IllegalStateException() // TODO
-                }
-                buffer.flip()
-                messageDigest.update(buffer)
-                remaining -= read
-            }
-            return messageDigest
-        }
-    }
-
-    private fun commitBlobUpload(repositoryName: String, id: String, digest: OciDigest): Boolean {
-        val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
-        if (!blobUploadDataFile.exists()) return false // TODO
-        val blobFile = resolveBlobFile(digest).createParentDirectories()
-        try {
-            if (!blobFile.exists()) {
+        return Mono.using(
+            {
                 try {
-                    blobUploadDataFile.moveTo(blobFile)
+                    FileChannel.open(blobUploadDataFile, StandardOpenOption.READ, StandardOpenOption.WRITE)
                 } catch (e: IOException) {
-                    if ((e is NoSuchFileException) || !blobUploadDataFile.exists()) return false
-                    if ((e !is FileAlreadyExistsException) && !blobFile.exists()) throw e
+                    throw NoSuchElementException()
                 }
+            },
+            { fileChannel ->
+                val messageDigest = digest.algorithm.createMessageDigest()
+                if (offset > 0) {
+                    messageDigest.update(fileChannel, 0, offset)
+                }
+                fileChannel.write(
+                    data.doOnNext { byteBuf -> messageDigest.update(byteBuf.nioBuffer()) },
+                    offset,
+                ).map { position ->
+                    if (position < fileChannel.size()) {
+                        messageDigest.update(fileChannel, position, Long.MAX_VALUE)
+                    }
+                    OciDigest(digest.algorithm, messageDigest.digest())
+                }
+            },
+        ).doOnNext { actualDigest ->
+            try {
+                if (digest != actualDigest) {
+                    throw DigestException()
+                }
+                val blobFile = resolveBlobFile(digest).createParentDirectories()
+                blobUploadDataFile.moveToIfNotExists(blobFile)
+            } finally {
+                blobUploadDataFile.deleteIfExists()
+                blobUploadDataFile.parent.deleteIfExists()
             }
-        } finally {
-            blobUploadDataFile.deleteIfExists()
-            blobUploadDataFile.parent.deleteExisting()
+            resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
+                .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
         }
-        resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
-            .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
-        return true
+    }
+
+    private fun FileChannel.write(data: Flux<ByteBuf>, offset: Long): Mono<Long> =
+        data.scan(offset) { position, byteBuf ->
+            val length = byteBuf.readableBytes()
+            byteBuf.readBytes(this, position, length)
+            position + length
+        }.last()
+
+    private fun MessageDigest.update(fileChannel: FileChannel, offset: Long, length: Long) {
+        val bufferCapacity = 8192
+        val buffer = ByteBuffer.allocate(bufferCapacity)
+        var position = offset
+        var remaining = length
+        while (remaining > 0) {
+            buffer.position(0)
+            buffer.limit(min(remaining, bufferCapacity.toLong()).toInt())
+            val read = fileChannel.read(buffer, position)
+            if (read == -1) {
+                if (length == Long.MAX_VALUE) {
+                    break
+                }
+                throw IllegalStateException() // TODO
+            }
+            buffer.flip()
+            update(buffer)
+            position += read
+            remaining -= read
+        }
     }
 
     private fun resolveBlobFile(digest: OciDigest): Path {
@@ -248,13 +236,17 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         val tempFile = createTempFile(parent, name)
         try {
             writeOperation(tempFile)
-            try {
-                tempFile.moveTo(this)
-            } catch (e: IOException) {
-                if ((e !is FileAlreadyExistsException) && !exists()) throw e
-            }
+            tempFile.moveToIfNotExists(this)
         } finally {
             tempFile.deleteIfExists()
+        }
+    }
+
+    private fun Path.moveToIfNotExists(target: Path) {
+        try {
+            moveTo(target)
+        } catch (e: IOException) {
+            if ((e !is FileAlreadyExistsException) && !target.exists()) throw e
         }
     }
 }
