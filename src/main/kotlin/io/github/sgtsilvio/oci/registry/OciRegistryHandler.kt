@@ -337,8 +337,7 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
         return if (storage.mountBlob(repositoryName, digest, fromRepositoryName)) {
-            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-            response.status(CREATED).send()
+            response.sendBlobCreated(repositoryName, digest)
         } else {
             createBlobUpload(repositoryName, response)
         }
@@ -362,8 +361,7 @@ class OciRegistryHandler(
         }
         val id = storage.createBlobUpload(repositoryName)
         return storage.finishBlobUpload(repositoryName, id, request.receive(), 0, digest).flatMap {
-            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-            response.status(CREATED).send()
+            response.sendBlobCreated(repositoryName, digest)
         }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
             when (error) {
                 is DigestException -> response.sendBadRequest()
@@ -456,8 +454,7 @@ class OciRegistryHandler(
             currentSize
         }
         return storage.finishBlobUpload(repositoryName, id, request.receive(), offset, digest).flatMap {
-            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-            response.status(CREATED).send()
+            response.sendBlobCreated(repositoryName, digest)
         }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
             when (error) {
                 is NoSuchElementException -> response.sendNotFound()
@@ -466,6 +463,9 @@ class OciRegistryHandler(
             }
         }
     }
+
+    private fun HttpServerResponse.sendBlobCreated(repositoryName: String, digest: OciDigest) =
+        status(CREATED).header(LOCATION, "/v2/$repositoryName/blobs/$digest").send()
 }
 
 private val URI.queryParameters: Map<String, String> // TODO move to UriExtensions
