@@ -364,7 +364,7 @@ class OciRegistryHandler(
         return storage.finishBlobUpload(repositoryName, id, request.receive(), 0, digest).flatMap {
             response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
             response.status(CREATED).send()
-        }.onErrorResume { error ->
+        }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
             when (error) {
                 is DigestException -> response.sendBadRequest()
                 else -> throw error
@@ -384,6 +384,8 @@ class OciRegistryHandler(
         response.header(RANGE, "0-${size - 1}")
         return response.status(NO_CONTENT).send()
     }
+
+    // TODO exclusive access for writing (path/putBlobUpload), try lock else respond 416 range not satisfiable
 
     private fun patchBlobUpload(
         repositoryName: String,
@@ -414,7 +416,7 @@ class OciRegistryHandler(
             response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
             response.header(RANGE, "0-${size - 1}")
             response.status(ACCEPTED).send()
-        }.onErrorResume { error ->
+        }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
             when (error) {
                 is NoSuchElementException -> response.sendNotFound()
                 else -> throw error
@@ -456,7 +458,7 @@ class OciRegistryHandler(
         return storage.finishBlobUpload(repositoryName, id, request.receive(), offset, digest).flatMap {
             response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
             response.status(CREATED).send()
-        }.onErrorResume { error ->
+        }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
             when (error) {
                 is NoSuchElementException -> response.sendNotFound()
                 is DigestException -> response.sendBadRequest()

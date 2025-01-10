@@ -87,8 +87,6 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             { fileChannel -> fileChannel.write(data, offset) },
         )
 
-    // TODO exclusive access for writing, try lock else respond 416 range not satisfiable
-
     override fun finishBlobUpload(
         repositoryName: String,
         id: String,
