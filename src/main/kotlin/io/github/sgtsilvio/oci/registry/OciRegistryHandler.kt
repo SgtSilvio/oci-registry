@@ -1,6 +1,7 @@
 package io.github.sgtsilvio.oci.registry
 
 import io.github.sgtsilvio.oci.registry.http.*
+import io.netty.buffer.ByteBuf
 import io.netty.handler.codec.http.HttpHeaderNames.*
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
@@ -8,6 +9,7 @@ import io.netty.handler.codec.http.HttpResponseStatus.*
 import org.json.JSONException
 import org.json.JSONObject
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.netty.http.server.HttpServerRequest
 import reactor.netty.http.server.HttpServerResponse
@@ -341,13 +343,7 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
         val id = storage.createBlobUpload(repositoryName)
-        return storage.writeBlobUpload(repositoryName, id, request.receive(), 0).flatMap {
-            // TODO cleanup blob upload on failure
-            // TODO validate digest
-            storage.finishBlobUpload(repositoryName, id, digest)
-            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-            response.status(CREATED).send()
-        }
+        return finishBlobUpload(repositoryName, id, request.receive(), 0, digest, response)
     }
 
     private fun mountBlob(
@@ -400,14 +396,14 @@ class OciRegistryHandler(
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
-        val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
         val offset = if (contentRange == null) 0 else {
+            val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
             if (contentRange.first != currentSize) {
                 return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
             }
             currentSize
         }
-        return storage.writeBlobUpload(repositoryName, id, request.receive(), offset).flatMap { size ->
+        return storage.progressBlobUpload(repositoryName, id, request.receive(), offset).flatMap { size -> // TODO handle error
             response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
             response.header(RANGE, "0-${size - 1}")
             response.status(ACCEPTED).send()
@@ -445,13 +441,20 @@ class OciRegistryHandler(
             }
             currentSize
         }
-        return storage.writeBlobUpload(repositoryName, id, request.receive(), offset).flatMap {
-            // TODO cleanup blob upload on failure
-            // TODO validate digest
-            storage.finishBlobUpload(repositoryName, id, digest)
-            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-            response.status(CREATED).send()
-        }
+        return finishBlobUpload(repositoryName, id, request.receive(), offset, digest, response)
+    }
+
+    private fun finishBlobUpload(
+        repositoryName: String,
+        id: String,
+        data: Flux<ByteBuf>,
+        offset: Long,
+        digest: OciDigest,
+        response: HttpServerResponse,
+    ): Publisher<Void> = storage.finishBlobUpload(repositoryName, id, data, offset, digest).flatMap { // TODO handle error
+        // TODO cleanup blob upload on failure
+        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+        response.status(CREATED).send()
     }
 }
 

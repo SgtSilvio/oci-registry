@@ -1,13 +1,20 @@
 package io.github.sgtsilvio.oci.registry
 
+import io.netty.buffer.ByteBuf
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import reactor.netty.ByteBufFlux
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import java.nio.file.*
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.NoSuchFileException
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.security.DigestException
+import java.security.MessageDigest
 import java.util.*
-import kotlin.NoSuchElementException
 import kotlin.io.path.*
+import kotlin.math.min
 
 /**
  * @author Silvio Giebl
@@ -69,7 +76,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         }
     }
 
-    override fun writeBlobUpload(repositoryName: String, id: String, data: ByteBufFlux, offset: Long): Mono<Long> =
+    override fun progressBlobUpload(repositoryName: String, id: String, data: Flux<ByteBuf>, offset: Long): Mono<Long> =
         Mono.using(
             {
                 try {
@@ -87,9 +94,70 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             },
         )
 
-    override fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest): Boolean {
+    // TODO exclusive access for writing, try lock else respond 416 range not satisfiable
+
+    override fun finishBlobUpload(
+        repositoryName: String,
+        id: String,
+        data: Flux<ByteBuf>,
+        offset: Long,
+        digest: OciDigest
+    ): Mono<OciDigest> {
         val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
-        if (!blobUploadDataFile.exists()) return false
+        return Mono.defer {
+            val messageDigest = if (offset == 0L) {
+                digest.algorithm.createMessageDigest()
+            } else {
+                blobUploadDataFile.getMessageDigest(offset, digest.algorithm) // TODO handle IOException
+            }
+            progressBlobUpload(
+                repositoryName,
+                id,
+                data.doOnNext { byteBuf -> messageDigest.update(byteBuf.nioBuffer()) },
+                offset,
+            ).map { written ->
+                val hash = if (written == blobUploadDataFile.fileSize()) { // TODO handle IOException
+                    messageDigest
+                } else {
+                    blobUploadDataFile.getMessageDigest(Long.MAX_VALUE, digest.algorithm) // TODO handle IOException
+                }.digest()
+                OciDigest(digest.algorithm, hash)
+            }
+        }.doOnNext { actualDigest ->
+            if (digest != actualDigest) {
+                throw DigestException()
+            }
+            commitBlobUpload(repositoryName, id, digest)
+        }
+    }
+
+    private fun Path.getMessageDigest(size: Long, digestAlgorithm: OciDigestAlgorithm): MessageDigest {
+        FileChannel.open(this, StandardOpenOption.READ).use { fileChannel ->
+            val messageDigest = digestAlgorithm.createMessageDigest()
+            val bufferCapacity = 8192
+            val buffer = ByteBuffer.allocate(bufferCapacity)
+            var remaining = size
+            while (remaining > 0) {
+                buffer.position(0)
+                buffer.limit(min(remaining, bufferCapacity.toLong()).toInt())
+                val read = fileChannel.read(buffer)
+                if (read == -1) {
+                    if (size == Long.MAX_VALUE) {
+                        return messageDigest
+                    }
+                    throw IllegalStateException() // TODO
+                }
+                buffer.flip()
+                messageDigest.update(buffer)
+                remaining -= read
+            }
+            return messageDigest
+        }
+    }
+
+    private fun commitBlobUpload(repositoryName: String, id: String, digest: OciDigest): Boolean {
+        val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
+        if (!blobUploadDataFile.exists()) return false // TODO
         val blobFile = resolveBlobFile(digest).createParentDirectories()
         try {
             if (!blobFile.exists()) {

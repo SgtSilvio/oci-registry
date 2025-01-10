@@ -1,7 +1,8 @@
 package io.github.sgtsilvio.oci.registry
 
+import io.netty.buffer.ByteBuf
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import reactor.netty.ByteBufFlux
 import java.nio.file.Path
 
 /**
@@ -25,12 +26,18 @@ sealed class OciRegistryStorage {
 
     internal abstract fun getBlobUploadSize(repositoryName: String, id: String): Long?
 
-    internal abstract fun writeBlobUpload(
+    internal abstract fun progressBlobUpload(
         repositoryName: String,
         id: String,
-        data: ByteBufFlux,
+        data: Flux<ByteBuf>,
         offset: Long,
     ): Mono<Long>
 
-    internal abstract fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest): Boolean
+    internal abstract fun finishBlobUpload(
+        repositoryName: String,
+        id: String,
+        data: Flux<ByteBuf>,
+        offset: Long,
+        digest: OciDigest,
+    ): Mono<OciDigest>
 }
