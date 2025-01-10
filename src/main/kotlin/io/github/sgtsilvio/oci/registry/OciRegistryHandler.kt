@@ -1,7 +1,6 @@
 package io.github.sgtsilvio.oci.registry
 
 import io.github.sgtsilvio.oci.registry.http.*
-import io.netty.buffer.ByteBuf
 import io.netty.handler.codec.http.HttpHeaderNames.*
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
@@ -9,7 +8,6 @@ import io.netty.handler.codec.http.HttpResponseStatus.*
 import org.json.JSONException
 import org.json.JSONObject
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.netty.http.server.HttpServerRequest
 import reactor.netty.http.server.HttpServerResponse
@@ -344,7 +342,15 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
         val id = storage.createBlobUpload(repositoryName)
-        return finishBlobUpload(repositoryName, id, request.receive(), 0, digest, response)
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), 0, digest).flatMap {
+            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+            response.status(CREATED).send()
+        }.onErrorResume { error ->
+            when (error) {
+                is DigestException -> response.sendBadRequest()
+                else -> throw error
+            }
+        }
     }
 
     private fun mountBlob(
@@ -447,25 +453,15 @@ class OciRegistryHandler(
             }
             currentSize
         }
-        return finishBlobUpload(repositoryName, id, request.receive(), offset, digest, response)
-    }
-
-    private fun finishBlobUpload(
-        repositoryName: String,
-        id: String,
-        data: Flux<ByteBuf>,
-        offset: Long,
-        digest: OciDigest,
-        response: HttpServerResponse,
-    ): Publisher<Void> = storage.finishBlobUpload(repositoryName, id, data, offset, digest).flatMap {
-        // TODO cleanup blob upload on failure
-        response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-        response.status(CREATED).send()
-    }.onErrorResume { error ->
-        when (error) {
-            is NoSuchElementException -> response.sendNotFound()
-            is DigestException -> response.sendBadRequest()
-            else -> throw error
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), offset, digest).flatMap {
+            response.header(LOCATION, "/v2/$repositoryName/blobs/$digest")
+            response.status(CREATED).send()
+        }.onErrorResume { error ->
+            when (error) {
+                is NoSuchElementException -> response.sendNotFound()
+                is DigestException -> response.sendBadRequest()
+                else -> throw error
+            }
         }
     }
 }
