@@ -85,7 +85,6 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
                     position + length
                 }.last()
             },
-            { fileChannel -> fileChannel.close() },
         )
 
     override fun finishBlobUpload(repositoryName: String, id: String, digest: OciDigest): Boolean {
