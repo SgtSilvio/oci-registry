@@ -6,7 +6,7 @@ import java.security.MessageDigest
 /**
  * @author Silvio Giebl
  */
-internal class OciDigest(val algorithm: OciDigestAlgorithm, val hash: ByteArray) {
+internal class OciDigest(val algorithm: OciDigestAlgorithm, val hash: ByteArray) : OciReference {
     val encodedHash get() = algorithm.encodeHash(hash)
 
     init {

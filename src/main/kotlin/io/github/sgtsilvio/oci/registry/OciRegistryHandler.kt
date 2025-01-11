@@ -135,33 +135,31 @@ class OciRegistryHandler(
 
     private fun handleManifest(
         repositoryName: String,
-        reference: String,
+        rawReference: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
-    ): Publisher<Void> = when (request.method()) {
-        GET -> getOrHeadManifest(repositoryName, reference, true, response)
-        HEAD -> getOrHeadManifest(repositoryName, reference, false, response)
-        PUT -> putManifest(repositoryName, reference, request, response)
-        DELETE -> deleteManifest(repositoryName, reference, response)
-        else -> response.status(METHOD_NOT_ALLOWED).send()
+    ): Publisher<Void> {
+        val reference = try {
+            rawReference.toOciReference()
+        } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        return when (request.method()) {
+            GET -> getOrHeadManifest(repositoryName, reference, true, response)
+            HEAD -> getOrHeadManifest(repositoryName, reference, false, response)
+            PUT -> putManifest(repositoryName, reference, request, response)
+            DELETE -> deleteManifest(repositoryName, reference, response)
+            else -> response.status(METHOD_NOT_ALLOWED).send()
+        }
     }
 
     private fun getOrHeadManifest(
         repositoryName: String,
-        reference: String,
+        reference: OciReference,
         isGet: Boolean,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val manifestBytes = if (':' in reference) {
-            val digest = try {
-                reference.toOciDigest()
-            } catch (e: IllegalArgumentException) {
-                return response.sendBadRequest()
-            }
-            storage.getManifest(repositoryName, digest)
-        } else {
-            storage.getManifest(repositoryName, reference)
-        } ?: return response.sendNotFound()
+        val manifestBytes = storage.getManifest(repositoryName, reference) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
         response.header(CONTENT_LENGTH, manifestBytes.size.toString())
         return if (isGet) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
@@ -169,33 +167,20 @@ class OciRegistryHandler(
 
     private fun putManifest(
         repositoryName: String,
-        reference: String,
+        reference: OciReference,
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val digest: OciDigest?
-        val tag: String?
-        if (':' in reference) {
-            digest = try {
-                reference.toOciDigest()
-            } catch (e: IllegalArgumentException) {
-                return response.sendBadRequest()
-            }
-            tag = null
-        } else {
-            digest = null
-            tag = reference
-        }
         val contentType = request.requestHeaders()[CONTENT_TYPE]
         return request.receive().aggregate().asByteArray().flatMap { data ->
-            putManifest(repositoryName, digest, tag, contentType, data, response)
+            putManifest(repositoryName, reference as? OciDigest, reference as? OciTag, contentType, data, response)
         }
     }
 
     private fun putManifest(
         repositoryName: String,
         digest: OciDigest?,
-        tag: String?,
+        tag: OciTag?,
         mediaType: String?,
         data: ByteArray,
         response: HttpServerResponse,
@@ -237,7 +222,7 @@ class OciRegistryHandler(
 
     private fun deleteManifest(
         repositoryName: String,
-        reference: String,
+        reference: OciReference,
         response: HttpServerResponse,
     ): Publisher<Void> {
         return response.status(METHOD_NOT_ALLOWED).send()
