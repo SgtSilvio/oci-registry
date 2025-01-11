@@ -121,6 +121,8 @@ private class UnsupportedOciDigestAlgorithm(override val id: String) : OciDigest
     override fun toString() = id
 }
 
+internal fun OciDigestAlgorithm.isUnsupported() = this is UnsupportedOciDigestAlgorithm
+
 internal fun String.toOciDigest(): OciDigest {
     val colonIndex = indexOf(':')
     if (colonIndex == -1) {

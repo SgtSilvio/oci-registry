@@ -171,6 +171,9 @@ class OciRegistryHandler(
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
+        if ((reference is OciDigest) && reference.algorithm.isUnsupported()) {
+            return response.sendBadRequest()
+        }
         val contentType = request.requestHeaders()[CONTENT_TYPE]
         return request.receive().aggregate().asByteArray().flatMap { data ->
             putManifest(repositoryName, reference as? OciDigest, reference as? OciTag, contentType, data, response)
@@ -185,11 +188,7 @@ class OciRegistryHandler(
         data: ByteArray,
         response: HttpServerResponse,
     ): Mono<Void> {
-        val actualDigest = try {
-            data.calculateOciDigest(digest?.algorithm ?: StandardOciDigestAlgorithm.SHA_256)
-        } catch (e: UnsupportedOperationException) {
-            return response.sendBadRequest()
-        }
+        val actualDigest = data.calculateOciDigest(digest?.algorithm ?: StandardOciDigestAlgorithm.SHA_256)
         if ((digest != null) && (digest != actualDigest)) {
             return response.sendBadRequest()
         }
@@ -357,6 +356,9 @@ class OciRegistryHandler(
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
+        if (digest.algorithm.isUnsupported()) {
+            return response.sendBadRequest()
+        }
 //        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
         val contentType = request.requestHeaders()[CONTENT_TYPE]
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
@@ -436,6 +438,9 @@ class OciRegistryHandler(
         val digest = try {
             digestParameter.toOciDigest()
         } catch (e: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        if (digest.algorithm.isUnsupported()) {
             return response.sendBadRequest()
         }
         val requestHeaders = request.requestHeaders()
