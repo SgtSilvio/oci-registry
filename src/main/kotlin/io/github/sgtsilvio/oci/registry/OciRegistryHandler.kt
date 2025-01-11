@@ -16,33 +16,35 @@ import java.security.DigestException
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
 
-/*
-https://github.com/opencontainers/distribution-spec/blob/main/spec.md
-
-end-1   GET	    /v2/                                                        200     ✔
-end-2   GET	    /v2/<name>/blobs/<digest>                                   200/404 ✔
-end-2   HEAD    /v2/<name>/blobs/<digest>                                   200/404 ✔
-end-10  DELETE  /v2/<name>/blobs/<digest>                                   405     ✔
-end-3   GET	    /v2/<name>/manifests/<reference>                            200/404 ✔
-end-3   HEAD    /v2/<name>/manifests/<reference>                            200/404 ✔
-end-7   PUT     /v2/<name>/manifests/<reference>                            405     ✔
-end-9   DELETE  /v2/<name>/manifests/<reference>                            405     ✔
-end-4a  POST    /v2/<name>/blobs/uploads/                                   405     ✔
-end-4b  POST    /v2/<name>/blobs/uploads/?digest=<digest>                   405     ✔
-end-11  POST    /v2/<name>/blobs/uploads/?mount=<digest>&from=<other_name>  405     ✔
-end-13  GET     /v2/<name>/blobs/uploads/<reference>                        405     ✔
-end-5   PATCH   /v2/<name>/blobs/uploads/<reference>                        405     ✔
-        DELETE  /v2/<name>/blobs/uploads/<reference>                        405     ✔
-end-6   PUT     /v2/<name>/blobs/uploads/<reference>?digest=<digest>        405     ✔
-end-8a  GET     /v2/<name>/tags/list                                        405     ✔
-end-8b  GET     /v2/<name>/tags/list?n=<integer>&last=<tag name>            405     ✔
-end-12a GET     /v2/<name>/referrers/<digest>                               404
-end-12b GET     /v2/<name>/referrers/<digest>?artifactType=<artifactType>   404
-        GET     /v2/_catalog                                                405     ✔
-        GET     /v2/_catalog?n=<integer>&last=<repository name>             405     ✔
- */
-
 /**
+ * | resource                                                    | method | response codes | spec reference | category           |
+ * |-------------------------------------------------------------|--------|----------------|----------------|--------------------|
+ * | `/v2`, `/v2/`                                               | GET    | 200            | end-1          |                    |
+ * | `/v2`, `/v2/`                                               | HEAD   | 200            |                |                    |
+ * | `/v2/<name>/manifests/<reference>`                          | GET    | 200, 404       | end-3          | pull               |
+ * | `/v2/<name>/manifests/<reference>`                          | HEAD   | 200, 404       | end-3          | pull               |
+ * | `/v2/<name>/manifests/<reference>`                          | PUT    | 201            | end-7          | push               |
+ * | `/v2/<name>/manifests/<reference>`                          | DELETE | 405            | end-9          | content management |
+ * | `/v2/<name>/blobs/<digest>`                                 | GET    | 200, 404       | end-2          | pull               |
+ * | `/v2/<name>/blobs/<digest>`                                 | HEAD   | 200, 404       | end-2          | pull               |
+ * | `/v2/<name>/blobs/<digest>`                                 | DELETE | 405            | end-10         | content management |
+ * | `/v2/<name>/blobs/uploads/`                                 | POST   | 202            | end-4a         | push               |
+ * | `/v2/<name>/blobs/uploads/?mount=<digest>&from=<otherName>` | POST   | 201, 202       | end-11         | push               |
+ * | `/v2/<name>/blobs/uploads/?digest=<digest>`                 | POST   | 201, 202       | end-4b         | push               |
+ * | `/v2/<name>/blobs/uploads/<reference>`                      | GET    | 204, 404       | end-13         | push               |
+ * | `/v2/<name>/blobs/uploads/<reference>`                      | HEAD   | 204, 404       |                | push               |
+ * | `/v2/<name>/blobs/uploads/<reference>`                      | PATCH  | 202, 404       | end-5          | push               |
+ * | `/v2/<name>/blobs/uploads/<reference>`                      | DELETE | 405            |                | push               |
+ * | `/v2/<name>/blobs/uploads/<reference>?digest=<digest>`      | PUT    | 201, 404       | end-6          | push               |
+ * | `/v2/<name>/tags/list`                                      | GET    | 405            | end-8a         | content discovery  |
+ * | `/v2/<name>/tags/list?n=<integer>[&last=<tagName>]`         | GET    | 405            | end-8b         | content discovery  |
+ * | `/v2/<name>/referrers/<digest>`                             | GET    | 404            | end-12a        | content discovery  |
+ * | `/v2/<name>/referrers/<digest>?artifactType=<artifactType>` | GET    | 404            | end-12b        | content discovery  |
+ * | `/v2/_catalog`                                              | GET    | 405            |                | content discovery  |
+ * | `/v2/_catalog?n=<integer>[&last=<repositoryName>]`          | GET    | 405            |                | content discovery  |
+ *
+ * [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec/blob/main/spec.md)
+ *
  * @author Silvio Giebl
  */
 class OciRegistryHandler(
