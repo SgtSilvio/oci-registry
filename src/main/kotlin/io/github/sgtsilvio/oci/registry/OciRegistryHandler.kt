@@ -365,14 +365,15 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
         val id = storage.createBlobUpload(repositoryName)
-        return storage.finishBlobUpload(repositoryName, id, request.receive(), 0, digest).flatMap {
-            response.sendBlobCreated(repositoryName, digest)
-        }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
-            when (error) {
-                is DigestException -> response.sendBadRequest()
-                else -> throw error
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), 0, digest)
+            .materialize()
+            .flatMap { result ->
+                when (val error = result.throwable) {
+                    null -> response.sendBlobCreated(repositoryName, digest)
+                    is DigestException -> response.sendBadRequest()
+                    else -> throw error
+                }
             }
-        }
     }
 
     private fun createBlobUpload(repositoryName: String, response: HttpServerResponse): Publisher<Void> {
@@ -415,16 +416,21 @@ class OciRegistryHandler(
             }
             currentSize
         }
-        return storage.progressBlobUpload(repositoryName, id, request.receive(), offset).flatMap { size ->
-            response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
-            response.header(RANGE, "0-${size - 1}")
-            response.status(ACCEPTED).send()
-        }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
-            when (error) {
-                is NoSuchElementException -> response.sendNotFound()
-                else -> throw error
+        return storage.progressBlobUpload(repositoryName, id, request.receive(), offset)
+            .materialize()
+            .flatMap { result ->
+                when (val error = result.throwable) {
+                    null -> {
+                        val size = result.get()!!
+                        response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
+                        response.header(RANGE, "0-${size - 1}")
+                        response.status(ACCEPTED).send()
+                    }
+
+                    is NoSuchElementException -> response.sendNotFound()
+                    else -> throw error
+                }
             }
-        }
     }
 
     private fun putBlobUpload(
@@ -461,15 +467,16 @@ class OciRegistryHandler(
             }
             currentSize
         }
-        return storage.finishBlobUpload(repositoryName, id, request.receive(), offset, digest).flatMap {
-            response.sendBlobCreated(repositoryName, digest)
-        }.onErrorResume { error -> // TODO error handling after flatMap not 100% correct, would also handle errors from the flattened mono
-            when (error) {
-                is NoSuchElementException -> response.sendNotFound()
-                is DigestException -> response.sendBadRequest()
-                else -> throw error
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), offset, digest)
+            .materialize()
+            .flatMap { result ->
+                when (val error = result.throwable) {
+                    null -> response.sendBlobCreated(repositoryName, digest)
+                    is NoSuchElementException -> response.sendNotFound()
+                    is DigestException -> response.sendBadRequest()
+                    else -> throw error
+                }
             }
-        }
     }
 
     private fun HttpServerResponse.sendBlobCreated(repositoryName: String, digest: OciDigest) =
