@@ -100,8 +100,12 @@ class OciRegistryHandler(
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> = when (request.method()) {
-        GET -> response.status(METHOD_NOT_ALLOWED).send()
+        GET -> getRepositories(response)
         else -> response.status(METHOD_NOT_ALLOWED).send()
+    }
+
+    private fun getRepositories(response: HttpServerResponse): Publisher<Void> {
+        return response.status(METHOD_NOT_ALLOWED).send()
     }
 
     private fun handleTags(
@@ -138,7 +142,7 @@ class OciRegistryHandler(
         GET -> getOrHeadManifest(repositoryName, reference, true, response)
         HEAD -> getOrHeadManifest(repositoryName, reference, false, response)
         PUT -> putManifest(repositoryName, reference, request, response)
-        DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+        DELETE -> deleteManifest(repositoryName, reference, response)
         else -> response.status(METHOD_NOT_ALLOWED).send()
     }
 
@@ -231,6 +235,14 @@ class OciRegistryHandler(
         return response.status(CREATED).send()
     }
 
+    private fun deleteManifest(
+        repositoryName: String,
+        reference: String,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
     private fun handleBlob(
         repositoryName: String,
         rawDigest: String,
@@ -245,7 +257,7 @@ class OciRegistryHandler(
         return when (request.method()) {
             GET -> getBlob(repositoryName, digest, request, response)
             HEAD -> headBlob(repositoryName, digest, response)
-            DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+            DELETE -> deleteBlob(repositoryName, digest, response)
             else -> response.status(METHOD_NOT_ALLOWED).send()
         }
     }
@@ -289,6 +301,10 @@ class OciRegistryHandler(
         return response.send()
     }
 
+    private fun deleteBlob(repositoryName: String, digest: OciDigest, response: HttpServerResponse): Publisher<Void> {
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
+
     private fun handleBlobUpload(
         repositoryName: String,
         id: String,
@@ -304,7 +320,7 @@ class OciRegistryHandler(
             GET, HEAD -> getOrHeadBlobUpload(repositoryName, id, response)
             PATCH -> patchBlobUpload(repositoryName, id, request, response)
             PUT -> putBlobUpload(repositoryName, id, request, response)
-            DELETE -> response.status(METHOD_NOT_ALLOWED).send()
+            DELETE -> deleteBlobUpload(repositoryName, id, response)
             else -> response.status(METHOD_NOT_ALLOWED).send()
         }
     }
@@ -468,6 +484,10 @@ class OciRegistryHandler(
 
     private fun HttpServerResponse.sendBlobCreated(repositoryName: String, digest: OciDigest) =
         status(CREATED).header(LOCATION, "/v2/$repositoryName/blobs/$digest").send()
+
+    private fun deleteBlobUpload(repositoryName: String, id: String, response: HttpServerResponse): Publisher<Void> {
+        return response.status(METHOD_NOT_ALLOWED).send()
+    }
 }
 
 private val URI.queryParameters: Map<String, String> // TODO move to UriExtensions
