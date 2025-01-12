@@ -12,6 +12,7 @@ import java.nio.file.StandardOpenOption
 import java.security.DigestException
 import java.security.MessageDigest
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.*
 import kotlin.math.min
 
@@ -76,17 +77,35 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         }
     }
 
-    override fun progressBlobUpload(repositoryName: String, id: String, data: Flux<ByteBuf>, offset: Long): Mono<Long> =
-        Mono.using(
+    private val blobUploadsInProgress = ConcurrentHashMap<Path, Boolean>()
+
+    private fun <T> lockBlobUpload(repositoryName: String, id: String, block: (Path) -> Mono<T>): Mono<T> {
+        return Mono.using(
             {
+                val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
+                if (blobUploadsInProgress.putIfAbsent(blobUploadDataFile, true) != null) {
+                    throw ConcurrentModificationException()
+                }
+                blobUploadDataFile
+            },
+            block,
+            { blobUploadDataFile -> blobUploadsInProgress.remove(blobUploadDataFile) },
+        )
+    }
+
+    override fun progressBlobUpload(repositoryName: String, id: String, data: Flux<ByteBuf>, offset: Long): Mono<Long> {
+        return lockBlobUpload(repositoryName, id) { blobUploadDataFile ->
+            Mono.using({
                 try {
-                    FileChannel.open(resolveBlobUploadDataFile(repositoryName, id), StandardOpenOption.WRITE)
+                    FileChannel.open(blobUploadDataFile, StandardOpenOption.WRITE)
                 } catch (e: IOException) {
                     throw NoSuchElementException()
                 }
-            },
-            { fileChannel -> fileChannel.write(data, offset) },
-        )
+            }) { fileChannel ->
+                fileChannel.write(data, offset)
+            }
+        }
+    }
 
     override fun finishBlobUpload(
         repositoryName: String,
@@ -95,16 +114,14 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         offset: Long,
         digest: OciDigest,
     ): Mono<OciDigest> {
-        val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
-        return Mono.using(
-            {
+        return lockBlobUpload(repositoryName, id) { blobUploadDataFile ->
+            Mono.using({
                 try {
                     FileChannel.open(blobUploadDataFile, StandardOpenOption.READ, StandardOpenOption.WRITE)
                 } catch (e: IOException) {
                     throw NoSuchElementException()
                 }
-            },
-            { fileChannel ->
+            }) { fileChannel ->
                 val messageDigest = digest.algorithm.createMessageDigest()
                 if (offset > 0) {
                     messageDigest.update(fileChannel, 0, offset)
@@ -118,20 +135,20 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
                     }
                     OciDigest(digest.algorithm, messageDigest.digest())
                 }
-            },
-        ).doOnNext { actualDigest ->
-            try {
-                if (digest != actualDigest) {
-                    throw DigestException()
+            }.doOnNext { actualDigest ->
+                try {
+                    if (digest != actualDigest) {
+                        throw DigestException()
+                    }
+                    val blobFile = resolveBlobFile(digest).createParentDirectories()
+                    blobUploadDataFile.moveToIfNotExists(blobFile)
+                } finally {
+                    blobUploadDataFile.deleteIfExists()
+                    blobUploadDataFile.parent.deleteIfExists()
                 }
-                val blobFile = resolveBlobFile(digest).createParentDirectories()
-                blobUploadDataFile.moveToIfNotExists(blobFile)
-            } finally {
-                blobUploadDataFile.deleteIfExists()
-                blobUploadDataFile.parent.deleteIfExists()
+                resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
+                    .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
             }
-            resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
-                .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
         }
     }
 

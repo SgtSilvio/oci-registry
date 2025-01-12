@@ -389,8 +389,6 @@ class OciRegistryHandler(
         return response.status(NO_CONTENT).send()
     }
 
-    // TODO exclusive access for writing (path/putBlobUpload), try lock else respond 416 range not satisfiable
-
     private fun patchBlobUpload(
         repositoryName: String,
         id: String,
@@ -411,7 +409,7 @@ class OciRegistryHandler(
         }
         val offset = if (contentRange == null) 0 else {
             val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
-            if (contentRange.first != currentSize) {
+            if (contentRange.first != currentSize) { // TODO move check into progressBlobUpload inside lock
                 return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
             }
             currentSize
@@ -428,6 +426,7 @@ class OciRegistryHandler(
                     }
 
                     is NoSuchElementException -> response.sendNotFound()
+                    is ConcurrentModificationException -> response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
                     else -> throw error
                 }
             }
@@ -462,7 +461,7 @@ class OciRegistryHandler(
         }
         val offset = if (contentRange == null) 0 else {
             val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
-            if (contentRange.first != currentSize) {
+            if (contentRange.first != currentSize) { // TODO move check into finishBlobUpload inside lock
                 return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
             }
             currentSize
@@ -473,6 +472,7 @@ class OciRegistryHandler(
                 when (val error = result.throwable) {
                     null -> response.sendBlobCreated(repositoryName, digest)
                     is NoSuchElementException -> response.sendNotFound()
+                    is ConcurrentModificationException -> response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
                     is DigestException -> response.sendBadRequest()
                     else -> throw error
                 }
