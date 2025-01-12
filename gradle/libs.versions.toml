@@ -1,5 +1,5 @@
 [versions]
-commons-codec = "1.17.1"
+commons-codec = "1.17.2"
 json = "20240303"
 junit-jupiter = "5.11.4"
 reactor-netty = "1.2.1"
