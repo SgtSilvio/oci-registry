@@ -5,7 +5,8 @@
 [![GitHub](https://img.shields.io/github/license/sgtsilvio/oci-registry?color=brightgreen&style=for-the-badge)](LICENSE)
 [![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/sgtsilvio/oci-registry/check.yml?branch=main&style=for-the-badge)](https://github.com/SgtSilvio/oci-registry/actions/workflows/check.yml?query=branch%3Amain)
 
-OCI registry Java library that allows serving OCI artifacts to pull operations.
+Java library that implements an OCI registry according to the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec).
+Any OCI compliant client can be used to pull and push OCI / Docker images from and to this registry implementation, including Docker.
 
 ## How to Use
 

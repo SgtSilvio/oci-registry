@@ -12,7 +12,7 @@ group = "io.github.sgtsilvio"
 
 metadata {
     readableName = "OCI Registry Java Library"
-    description = "OCI registry Java library that allows serving OCI artifacts to pull operations"
+    description = "Java library that implements an OCI registry according to the OCI Distribution Specification"
     license {
         apache2()
     }
