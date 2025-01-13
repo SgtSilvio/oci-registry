@@ -397,7 +397,7 @@ class OciRegistryHandler(
         val requestHeaders = request.requestHeaders()
         val contentRange = try {
             // content-range header is required in spec, but docker sends PATCH without range
-            requestHeaders[CONTENT_RANGE]?.decodeRange()
+            requestHeaders[CONTENT_RANGE]?.decodeNonStandardHttpRange()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
@@ -454,7 +454,7 @@ class OciRegistryHandler(
         }
         val requestHeaders = request.requestHeaders()
         val contentRange = try {
-            requestHeaders[CONTENT_RANGE]?.decodeRange()
+            requestHeaders[CONTENT_RANGE]?.decodeNonStandardHttpRange()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
         }
@@ -504,7 +504,7 @@ private val URI.queryParameters: Map<String, String> // TODO move to UriExtensio
         }
     }
 
-private fun String.decodeRange(): HttpRange { // TODO placement
+private fun String.decodeNonStandardHttpRange(): HttpRange {
     val parts = split('-')
     if (parts.size != 2) {
         throw IllegalArgumentException("\"$this\" is not a valid range, it must contain exactly 1 '-' character.")
