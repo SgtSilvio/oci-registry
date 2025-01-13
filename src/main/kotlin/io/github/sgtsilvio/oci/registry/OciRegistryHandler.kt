@@ -254,7 +254,7 @@ class OciRegistryHandler(
     ): Publisher<Void> {
         val blobFile = storage.getBlob(repositoryName, digest) ?: return response.sendNotFound()
         val size = blobFile.fileSize()
-        val rangeHeader: String? = request.requestHeaders()[RANGE]
+        val rangeHeader = request.requestHeaders()[RANGE]
         if ((rangeHeader != null) && rangeHeader.startsWith("bytes=")) {
             val rangeSpecs = try {
                 rangeHeader.substring("bytes=".length).decodeHttpRangeSpecs()
@@ -359,7 +359,6 @@ class OciRegistryHandler(
         if (digest.algorithm.isUnsupported()) {
             return response.sendBadRequest()
         }
-//        val contentLengthHeader = request.requestHeaders()[CONTENT_LENGTH]
         val contentType = request.requestHeaders()[CONTENT_TYPE]
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
@@ -396,12 +395,17 @@ class OciRegistryHandler(
         response: HttpServerResponse,
     ): Publisher<Void> {
         val requestHeaders = request.requestHeaders()
-//        val contentLengthHeader = requestHeaders[CONTENT_LENGTH]
         val contentRange = try {
             // content-range header is required in spec, but docker sends PATCH without range
             requestHeaders[CONTENT_RANGE]?.decodeRange()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
+        }
+        if (contentRange != null) {
+            val contentLength = requestHeaders[CONTENT_LENGTH]?.toLongOrNull() ?: return response.sendBadRequest()
+            if (contentRange.size != contentLength) {
+                return response.sendBadRequest()
+            }
         }
         val contentType = requestHeaders[CONTENT_TYPE]
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
@@ -449,11 +453,16 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
         val requestHeaders = request.requestHeaders()
-//        val contentLengthHeader = requestHeaders[CONTENT_LENGTH]
         val contentRange = try {
             requestHeaders[CONTENT_RANGE]?.decodeRange()
         } catch (e: IllegalArgumentException) {
             return response.sendBadRequest()
+        }
+        if (contentRange != null) {
+            val contentLength = requestHeaders[CONTENT_LENGTH]?.toLongOrNull() ?: return response.sendBadRequest()
+            if (contentRange.size != contentLength) {
+                return response.sendBadRequest()
+            }
         }
         val contentType = requestHeaders[CONTENT_TYPE]
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
