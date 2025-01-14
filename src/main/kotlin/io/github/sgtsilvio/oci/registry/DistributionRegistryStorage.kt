@@ -14,7 +14,6 @@ import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.*
-import kotlin.math.min
 
 /**
  * @author Silvio Giebl
@@ -96,13 +95,17 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     override fun progressBlobUpload(repositoryName: String, id: String, data: Flux<ByteBuf>, offset: Long): Mono<Long> {
         return lockBlobUpload(repositoryName, id) { blobUploadDataFile ->
             Mono.using({
-                try {
+                val fileChannel = try {
                     FileChannel.open(blobUploadDataFile, StandardOpenOption.WRITE)
                 } catch (e: IOException) {
                     throw NoSuchElementException()
                 }
+                if ((offset != -1L) && (offset != fileChannel.size())) {
+                    throw IndexOutOfBoundsException()
+                }
+                fileChannel
             }) { fileChannel ->
-                fileChannel.write(data, offset)
+                fileChannel.write(data, offset.coerceAtLeast(0))
             }
         }
     }
@@ -116,11 +119,15 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     ): Mono<OciDigest> {
         return lockBlobUpload(repositoryName, id) { blobUploadDataFile ->
             Mono.using({
-                try {
+                val fileChannel = try {
                     FileChannel.open(blobUploadDataFile, StandardOpenOption.READ, StandardOpenOption.WRITE)
                 } catch (e: IOException) {
                     throw NoSuchElementException()
                 }
+                if ((offset != -1L) && (offset != fileChannel.size())) {
+                    throw IndexOutOfBoundsException()
+                }
+                fileChannel
             }) { fileChannel ->
                 val messageDigest = digest.algorithm.createMessageDigest()
                 if (offset > 0) {
@@ -128,7 +135,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
                 }
                 fileChannel.write(
                     data.doOnNext { byteBuf -> messageDigest.update(byteBuf.nioBuffer()) },
-                    offset,
+                    offset.coerceAtLeast(0),
                 ).map { position ->
                     if (position < fileChannel.size()) {
                         messageDigest.update(fileChannel, position, Long.MAX_VALUE)
@@ -166,7 +173,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         var remaining = length
         while (remaining > 0) {
             buffer.position(0)
-            buffer.limit(min(remaining, bufferCapacity.toLong()).toInt())
+            buffer.limit(remaining.coerceAtMost(bufferCapacity.toLong()).toInt())
             val read = fileChannel.read(buffer, position)
             if (read == -1) {
                 if (length == Long.MAX_VALUE) {

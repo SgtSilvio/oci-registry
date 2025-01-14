@@ -364,7 +364,7 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
         val id = storage.createBlobUpload(repositoryName)
-        return storage.finishBlobUpload(repositoryName, id, request.receive(), 0, digest)
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), -1, digest)
             .materialize()
             .flatMap { result ->
                 when (val error = result.throwable) {
@@ -411,14 +411,7 @@ class OciRegistryHandler(
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
-        val offset = if (contentRange == null) 0 else {
-            val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
-            if (contentRange.first != currentSize) { // TODO move check into progressBlobUpload inside lock
-                return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
-            }
-            currentSize
-        }
-        return storage.progressBlobUpload(repositoryName, id, request.receive(), offset)
+        return storage.progressBlobUpload(repositoryName, id, request.receive(), contentRange?.first ?: -1)
             .materialize()
             .flatMap { result ->
                 when (val error = result.throwable) {
@@ -431,6 +424,7 @@ class OciRegistryHandler(
 
                     is NoSuchElementException -> response.sendNotFound()
                     is ConcurrentModificationException -> response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
+                    is IndexOutOfBoundsException -> response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
                     else -> throw error
                 }
             }
@@ -468,20 +462,14 @@ class OciRegistryHandler(
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
-        val offset = if (contentRange == null) 0 else {
-            val currentSize = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
-            if (contentRange.first != currentSize) { // TODO move check into finishBlobUpload inside lock
-                return response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
-            }
-            currentSize
-        }
-        return storage.finishBlobUpload(repositoryName, id, request.receive(), offset, digest)
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), contentRange?.first ?: -1, digest)
             .materialize()
             .flatMap { result ->
                 when (val error = result.throwable) {
                     null -> response.sendBlobCreated(repositoryName, digest)
                     is NoSuchElementException -> response.sendNotFound()
                     is ConcurrentModificationException -> response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
+                    is IndexOutOfBoundsException -> response.status(REQUESTED_RANGE_NOT_SATISFIABLE).send()
                     is DigestException -> response.sendBadRequest()
                     else -> throw error
                 }
