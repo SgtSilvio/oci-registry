@@ -5,6 +5,7 @@ import io.netty.handler.codec.http.HttpHeaderNames.*
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
 import io.netty.handler.codec.http.HttpResponseStatus.*
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import org.reactivestreams.Publisher
@@ -204,11 +205,19 @@ class OciRegistryHandler(
         if ((mediaType != null) && (mediaType != actualMediaType)) {
             return response.sendBadRequest()
         }
-//        when (actualMediaType) {
-//            OCI_IMAGE_INDEX_MEDIA_TYPE, DOCKER_MANIFEST_LIST_MEDIA_TYPE -> // TODO validate manifest presence in manifest[].digest (size?)
-//            OCI_IMAGE_MANIFEST_MEDIA_TYPE, DOCKER_MANIFEST_MEDIA_TYPE -> // TODO validate blob presence in config.digest and layers[].digest (size?)
-//            else -> return response.sendBadRequest()
-//        }
+        when (actualMediaType) {
+            OCI_IMAGE_INDEX_MEDIA_TYPE, DOCKER_MANIFEST_LIST_MEDIA_TYPE -> {
+                if (!validateIndex(repositoryName, manifestJsonObject)) {
+                    return response.sendBadRequest()
+                }
+            }
+            OCI_IMAGE_MANIFEST_MEDIA_TYPE, DOCKER_MANIFEST_MEDIA_TYPE -> {
+                if (!validateManifest(repositoryName, manifestJsonObject)) {
+                    return response.sendBadRequest()
+                }
+            }
+            else -> return response.sendBadRequest()
+        }
         // TODO validate manifests json structure ignoring additional fields
         storage.putManifest(repositoryName, actualDigest, data)
         if (tag != null) {
@@ -217,6 +226,50 @@ class OciRegistryHandler(
         response.header(LOCATION, "/v2/$repositoryName/manifests/${tag ?: actualDigest}")
         response.header("docker-content-digest", actualDigest.toString())
         return response.status(CREATED).send()
+    }
+
+    private fun validateManifest(repositoryName: String, jsonObject: JSONObject): Boolean {
+        val config = jsonObject.opt("config") as? JSONObject ?: return false
+        val rawConfigDigest = config.opt("digest") as? String ?: return false
+        val configDigest = try {
+            rawConfigDigest.toOciDigest()
+        } catch (e: IllegalArgumentException) {
+            return false
+        }
+        if (storage.getBlob(repositoryName, configDigest) == null) {
+            return false
+        }
+        val layers = jsonObject.opt("layers") as? JSONArray ?: return false
+        for (layer in layers) {
+            if (layer !is JSONObject) return false
+            val rawLayerDigest = layer.opt("digest") as? String ?: return false
+            val layerDigest = try {
+                rawLayerDigest.toOciDigest()
+            } catch (e: IllegalArgumentException) {
+                return false
+            }
+            if (storage.getBlob(repositoryName, layerDigest) == null) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun validateIndex(repositoryName: String, jsonObject: JSONObject): Boolean {
+        val manifests = jsonObject.opt("manifests") as? JSONArray ?: return false
+        for (manifest in manifests) {
+            if (manifest !is JSONObject) return false
+            val rawManifestDigest = manifest.opt("digest") as? String ?: return false
+            val manifestDigest = try {
+                rawManifestDigest.toOciDigest()
+            } catch (e: IllegalArgumentException) {
+                return false
+            }
+            if (storage.getManifest(repositoryName, manifestDigest) == null) {
+                return false
+            }
+        }
+        return true
     }
 
     private fun deleteManifest(
