@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.sgtsilvio:oci-registry:0.5.0")
+    implementation("io.github.sgtsilvio:oci-registry:0.6.0")
 }
 ```
 
