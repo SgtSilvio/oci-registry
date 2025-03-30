@@ -13,5 +13,5 @@ reactor-netty = { module = "io.projectreactor.netty:reactor-netty", version.ref 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version = "1.9.25" }
 defaults = { id = "io.github.sgtsilvio.gradle.defaults", version = "0.2.0" }
-mavenCentralPublishing = { id = "io.github.sgtsilvio.gradle.maven-central-publishing", version = "0.1.0" }
+mavenCentralPublishing = { id = "io.github.sgtsilvio.gradle.maven-central-publishing", version = "0.2.0" }
 metadata = { id = "io.github.sgtsilvio.gradle.metadata", version = "0.6.0" }
