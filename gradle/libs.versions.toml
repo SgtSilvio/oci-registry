@@ -1,6 +1,6 @@
 [versions]
 commons-codec = "1.18.0"
-json = "20250107"
+json = "20250517"
 junit-jupiter = "5.12.2"
 reactor-netty = "1.2.6"
 
