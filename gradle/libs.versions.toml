@@ -2,7 +2,7 @@
 commons-codec = "1.19.0"
 json = "20250517"
 junit-jupiter = "5.13.4"
-reactor-netty = "1.2.8"
+reactor-netty = "1.2.10"
 
 [libraries]
 commons-codec = { module = "commons-codec:commons-codec", version.ref = "commons-codec" }
