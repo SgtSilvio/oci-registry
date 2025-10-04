@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+
 plugins {
     `java-library`
     alias(libs.plugins.kotlin.jvm)
@@ -26,11 +28,19 @@ metadata {
 }
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(8)
-    }
     withJavadocJar()
     withSourcesJar()
+}
+
+kotlin {
+    jvmToolchain(8)
+}
+
+tasks.compileKotlin {
+    compilerOptions {
+        apiVersion = KotlinVersion.KOTLIN_2_0
+        languageVersion = KotlinVersion.KOTLIN_2_0
+    }
 }
 
 repositories {
