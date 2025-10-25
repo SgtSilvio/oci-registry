@@ -144,7 +144,7 @@ class OciRegistryHandler(
     ): Publisher<Void> {
         val reference = try {
             rawReference.toOciReference()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         return when (request.method()) {
@@ -198,7 +198,7 @@ class OciRegistryHandler(
         }
         val manifestJsonObject = try {
             JSONObject(data.decodeToString())
-        } catch (e: JSONException) {
+        } catch (_: JSONException) {
             return response.sendBadRequest()
         }
         val actualMediaType = manifestJsonObject.opt("mediaType")
@@ -236,7 +236,7 @@ class OciRegistryHandler(
         val rawConfigDigest = config.opt("digest") as? String ?: return false
         val configDigest = try {
             rawConfigDigest.toOciDigest()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return false
         }
         if (storage.getBlob(repositoryName, configDigest) == null) {
@@ -248,7 +248,7 @@ class OciRegistryHandler(
             val rawLayerDigest = layer.opt("digest") as? String ?: return false
             val layerDigest = try {
                 rawLayerDigest.toOciDigest()
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 return false
             }
             if (storage.getBlob(repositoryName, layerDigest) == null) {
@@ -265,7 +265,7 @@ class OciRegistryHandler(
             val rawManifestDigest = manifest.opt("digest") as? String ?: return false
             val manifestDigest = try {
                 rawManifestDigest.toOciDigest()
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 return false
             }
             if (storage.getManifest(repositoryName, manifestDigest) == null) {
@@ -291,7 +291,7 @@ class OciRegistryHandler(
     ): Publisher<Void> {
         val digest = try {
             rawDigest.toOciDigest()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         return when (request.method()) {
@@ -314,13 +314,13 @@ class OciRegistryHandler(
         if ((rangeHeader != null) && rangeHeader.startsWith("bytes=")) {
             val rangeSpecs = try {
                 rangeHeader.substring("bytes=".length).decodeHttpRangeSpecs()
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 return response.sendBadRequest()
             }
             if (rangeSpecs.size == 1) {
                 val range = try {
                     rangeSpecs[0].createRange(size)
-                } catch (e: IllegalArgumentException) {
+                } catch (_: IllegalArgumentException) {
                     return response.sendRangeNotSatisfiable(size)
                 }
                 response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
@@ -394,7 +394,7 @@ class OciRegistryHandler(
     ): Publisher<Void> {
         val digest = try {
             rawDigest.toOciDigest()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         return if (storage.mountBlob(repositoryName, digest, fromRepositoryName)) {
@@ -412,7 +412,7 @@ class OciRegistryHandler(
     ): Publisher<Void> {
         val digest = try {
             rawDigest.toOciDigest()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         if (digest.algorithm.isUnsupported()) {
@@ -457,7 +457,7 @@ class OciRegistryHandler(
         val contentRange = try {
             // content-range header is required in spec, but docker sends PATCH without range
             requestHeaders[CONTENT_RANGE]?.decodeNonStandardHttpRange()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         if (contentRange != null) {
@@ -499,7 +499,7 @@ class OciRegistryHandler(
         val digestParameter = queryParameters["digest"] ?: return response.sendBadRequest()
         val digest = try {
             digestParameter.toOciDigest()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         if (digest.algorithm.isUnsupported()) {
@@ -508,7 +508,7 @@ class OciRegistryHandler(
         val requestHeaders = request.requestHeaders()
         val contentRange = try {
             requestHeaders[CONTENT_RANGE]?.decodeNonStandardHttpRange()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         if (contentRange != null) {

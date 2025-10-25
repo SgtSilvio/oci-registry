@@ -63,7 +63,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     override fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String): Boolean {
         val blobDigest = try {
             resolveBlobLinkFile(fromRepositoryName, digest).readText()
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             return false
         }.toOciDigest()
         if (!resolveBlobFile(blobDigest).exists()) {
@@ -83,7 +83,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     override fun getBlobUploadSize(repositoryName: String, id: String): Long? {
         return try {
             resolveBlobUploadDataFile(repositoryName, id).fileSize()
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             null
         }
     }
@@ -109,7 +109,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             Mono.using({
                 val fileChannel = try {
                     FileChannel.open(blobUploadDataFile, StandardOpenOption.WRITE)
-                } catch (e: IOException) {
+                } catch (_: IOException) {
                     throw NoSuchElementException()
                 }
                 if ((offset != -1L) && (offset != fileChannel.size())) {
@@ -133,7 +133,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             Mono.using({
                 val fileChannel = try {
                     FileChannel.open(blobUploadDataFile, StandardOpenOption.READ, StandardOpenOption.WRITE)
-                } catch (e: IOException) {
+                } catch (_: IOException) {
                     throw NoSuchElementException()
                 }
                 if ((offset != -1L) && (offset != fileChannel.size())) {
@@ -233,7 +233,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     private fun Path.resolveLinkedBlobFile(): Path? {
         val digest = try {
             readText()
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             return null
         }.toOciDigest()
         return resolveBlobFile(digest)
