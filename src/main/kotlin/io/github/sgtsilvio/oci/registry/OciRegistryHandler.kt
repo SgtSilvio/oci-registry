@@ -17,7 +17,7 @@ import java.security.DigestException
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
 
-const val DOCKER_CONTENT_DIGEST = "docker-content-digest"
+private const val DOCKER_CONTENT_DIGEST = "docker-content-digest"
 
 /**
  * | resource                                                    | method | response codes | spec reference | category           |
