@@ -59,12 +59,12 @@ class OciRegistryTest {
     private inner class ManifestByTagData {
         val repository = "example/repository-" + Random.nextUInt()
         val tag = "tag-" + Random.nextUInt()
+        val digestAlgorithm = "alg-" + Random.nextUInt()
+        val digestHash = "hash-" + Random.nextUInt()
         val mediaType = "mediaType-" + Random.nextUInt()
         val manifest = """{"mediaType":"$mediaType"}"""
 
         init {
-            val digestAlgorithm = "alg-" + Random.nextUInt()
-            val digestHash = "hash-" + Random.nextUInt()
             storageDir.resolve("blobs/$digestAlgorithm/${digestHash.substring(0, 2)}/$digestHash")
                 .createDirectories()
                 .resolve("data")
@@ -86,7 +86,11 @@ class OciRegistryTest {
                 assertEquals(OK, response.status())
                 assertEquals(data.mediaType, response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(data.manifest.length.toString(), response.responseHeaders()[CONTENT_LENGTH])
-                assertEquals(2, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(3, response.responseHeaders().size())
                 body.asString(Charsets.UTF_8)
             }
             .block()
@@ -103,7 +107,11 @@ class OciRegistryTest {
                 assertEquals(OK, response.status())
                 assertEquals(data.mediaType, response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(data.manifest.length.toString(), response.responseHeaders()[CONTENT_LENGTH])
-                assertEquals(2, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(3, response.responseHeaders().size())
                 body.asString(Charsets.UTF_8)
             }
             .block()
@@ -139,7 +147,11 @@ class OciRegistryTest {
                 assertEquals(OK, response.status())
                 assertEquals(data.mediaType, response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(data.manifest.length.toString(), response.responseHeaders()[CONTENT_LENGTH])
-                assertEquals(2, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(3, response.responseHeaders().size())
                 body.asString(Charsets.UTF_8)
             }
             .block()
@@ -156,7 +168,11 @@ class OciRegistryTest {
                 assertEquals(OK, response.status())
                 assertEquals(data.mediaType, response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(data.manifest.length.toString(), response.responseHeaders()[CONTENT_LENGTH])
-                assertEquals(2, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(3, response.responseHeaders().size())
                 body.asString(Charsets.UTF_8)
             }
             .block()
@@ -207,7 +223,11 @@ class OciRegistryTest {
                 assertEquals(OK, response.status())
                 assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(data.blob.size.toString(), response.responseHeaders()[CONTENT_LENGTH])
-                assertEquals(2, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(3, response.responseHeaders().size())
                 body.asByteArray()
             }
             .block()
@@ -224,7 +244,11 @@ class OciRegistryTest {
                 assertEquals(OK, response.status())
                 assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(data.blob.size.toString(), response.responseHeaders()[CONTENT_LENGTH])
-                assertEquals(2, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(3, response.responseHeaders().size())
                 body.asByteArray()
             }
             .block()
@@ -290,7 +314,11 @@ class OciRegistryTest {
                 assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(count.toString(), response.responseHeaders()[CONTENT_LENGTH])
                 assertEquals("bytes $first-$last/${data.blob.size}", response.responseHeaders()[CONTENT_RANGE])
-                assertEquals(3, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(4, response.responseHeaders().size())
                 body.asByteArray()
             }
             .block()
@@ -313,7 +341,11 @@ class OciRegistryTest {
                 assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(count.toString(), response.responseHeaders()[CONTENT_LENGTH])
                 assertEquals("bytes $first-$last/${data.blob.size}", response.responseHeaders()[CONTENT_RANGE])
-                assertEquals(3, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(4, response.responseHeaders().size())
                 body.asByteArray()
             }
             .block()
@@ -335,7 +367,11 @@ class OciRegistryTest {
                 assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(count.toString(), response.responseHeaders()[CONTENT_LENGTH])
                 assertEquals("bytes $first-$last/${data.blob.size}", response.responseHeaders()[CONTENT_RANGE])
-                assertEquals(3, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(4, response.responseHeaders().size())
                 body.asByteArray()
             }
             .block()
@@ -357,7 +393,11 @@ class OciRegistryTest {
                 assertEquals(APPLICATION_OCTET_STREAM.toString(), response.responseHeaders()[CONTENT_TYPE])
                 assertEquals(count.toString(), response.responseHeaders()[CONTENT_LENGTH])
                 assertEquals("bytes $first-$last/${data.blob.size}", response.responseHeaders()[CONTENT_RANGE])
-                assertEquals(3, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(4, response.responseHeaders().size())
                 body.asByteArray()
             }
             .block()
@@ -379,7 +419,11 @@ class OciRegistryTest {
                     "bytes 0-${data.blob.size - 1}/${data.blob.size}",
                     response.responseHeaders()[CONTENT_RANGE],
                 )
-                assertEquals(3, response.responseHeaders().size())
+                assertEquals(
+                    "${data.digestAlgorithm}:${data.digestHash}",
+                    response.responseHeaders()["docker-content-digest"],
+                )
+                assertEquals(4, response.responseHeaders().size())
                 body.asByteArray()
             }
             .block()
