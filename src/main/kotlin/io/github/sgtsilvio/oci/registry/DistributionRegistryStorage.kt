@@ -20,11 +20,23 @@ import kotlin.io.path.*
  */
 class DistributionRegistryStorage(private val directory: Path) : OciRegistryStorage() {
 
-    override fun getManifest(repositoryName: String, reference: OciReference): ByteArray? {
-        return when (reference) {
+    override fun getManifest(repositoryName: String, reference: OciReference): Pair<OciDigest, ByteArray>? {
+        val linkFile = when (reference) {
             is OciTag -> resolveManifestTagCurrentLinkFile(repositoryName, reference)
             is OciDigest -> resolveManifestLinkFile(repositoryName, reference)
-        }.readLinkedBlob()
+        }
+        val digest = try {
+            linkFile.readText()
+        } catch (_: IOException) {
+            return null
+        }.toOciDigest()
+        val blobFile = resolveBlobFile(digest)
+        val bytes = try {
+            blobFile.readBytes()
+        } catch (_: IOException) {
+            return null
+        }
+        return Pair(digest, bytes)
     }
 
     override fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray) {
@@ -225,15 +237,6 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             return null
         }.toOciDigest()
         return resolveBlobFile(digest)
-    }
-
-    private fun Path.readLinkedBlob(): ByteArray? {
-        val blobFile = resolveLinkedBlobFile() ?: return null
-        return try {
-            blobFile.readBytes()
-        } catch (e: IOException) {
-            null
-        }
     }
 
     private fun resolveBlobUploadDataFile(repositoryName: String, id: String): Path =
