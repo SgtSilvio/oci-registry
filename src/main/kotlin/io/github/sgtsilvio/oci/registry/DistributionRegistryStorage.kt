@@ -90,7 +90,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
 
     private val blobUploadsInProgress = ConcurrentHashMap<Path, Boolean>()
 
-    private fun <T> lockBlobUpload(repositoryName: String, id: String, block: (Path) -> Mono<T>): Mono<T> {
+    private fun <T : Any> lockBlobUpload(repositoryName: String, id: String, block: (Path) -> Mono<T>): Mono<T> {
         return Mono.using(
             {
                 val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
