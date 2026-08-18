@@ -559,7 +559,7 @@ private fun String.decodeNonStandardHttpRange(): HttpRange {
         throw IllegalArgumentException("\"$this\" is not a valid range, it must contain exactly 1 '-' character.")
     }
     val first = parts[0].toLong()
-    val last = parts[0].toLong()
+    val last = parts[1].toLong()
     if (last < first) {
         throw IllegalArgumentException("\"$this\" is not a valid range, last position must not be less than first position.")
     }
