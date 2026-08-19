@@ -141,31 +141,31 @@ class OciRegistryHandler(
 
     private fun handleManifest(
         repositoryName: String,
-        rawReference: String,
+        rawTagOrDigest: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val reference = try {
-            rawReference.toOciReference()
+        val tagOrDigest = try {
+            rawTagOrDigest.toOciTagOrDigest()
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
         return when (request.method()) {
-            GET -> getOrHeadManifest(repositoryName, reference, true, response)
-            HEAD -> getOrHeadManifest(repositoryName, reference, false, response)
-            PUT -> putManifest(repositoryName, reference, request, response)
-            DELETE -> deleteManifest(repositoryName, reference, response)
+            GET -> getOrHeadManifest(repositoryName, tagOrDigest, true, response)
+            HEAD -> getOrHeadManifest(repositoryName, tagOrDigest, false, response)
+            PUT -> putManifest(repositoryName, tagOrDigest, request, response)
+            DELETE -> deleteManifest(repositoryName, tagOrDigest, response)
             else -> response.status(METHOD_NOT_ALLOWED).send()
         }
     }
 
     private fun getOrHeadManifest(
         repositoryName: String,
-        reference: OciReference,
+        tagOrDigest: OciTagOrDigest,
         isGet: Boolean,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        val (digest, manifestBytes) = storage.getManifest(repositoryName, reference) ?: return response.sendNotFound()
+        val (digest, manifestBytes) = storage.getManifest(repositoryName, tagOrDigest) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
         response.header(CONTENT_LENGTH, manifestBytes.size.toString())
         response.header(DOCKER_CONTENT_DIGEST, digest.toString())
@@ -174,11 +174,11 @@ class OciRegistryHandler(
 
     private fun putManifest(
         repositoryName: String,
-        reference: OciReference,
+        tagOrDigest: OciTagOrDigest,
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        if ((reference is OciDigest) && reference.algorithm.isUnsupported()) {
+        if ((tagOrDigest is OciDigest) && tagOrDigest.algorithm.isUnsupported()) {
             return response.sendBadRequest()
         }
         val contentType = request.requestHeaders()[CONTENT_TYPE]
@@ -280,7 +280,7 @@ class OciRegistryHandler(
 
     private fun deleteManifest(
         repositoryName: String,
-        reference: OciReference,
+        tagOrDigest: OciTagOrDigest,
         response: HttpServerResponse,
     ): Publisher<Void> {
         return response.status(METHOD_NOT_ALLOWED).send()

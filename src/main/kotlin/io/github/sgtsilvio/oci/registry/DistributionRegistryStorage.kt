@@ -20,10 +20,10 @@ import kotlin.io.path.*
  */
 class DistributionRegistryStorage(private val directory: Path) : OciRegistryStorage() {
 
-    override fun getManifest(repositoryName: String, reference: OciReference): Pair<OciDigest, ByteArray>? {
-        val linkFile = when (reference) {
-            is OciTag -> resolveManifestTagCurrentLinkFile(repositoryName, reference)
-            is OciDigest -> resolveManifestLinkFile(repositoryName, reference)
+    override fun getManifest(repositoryName: String, tagOrDigest: OciTagOrDigest): Pair<OciDigest, ByteArray>? {
+        val linkFile = when (tagOrDigest) {
+            is OciTag -> resolveManifestTagCurrentLinkFile(repositoryName, tagOrDigest)
+            is OciDigest -> resolveManifestLinkFile(repositoryName, tagOrDigest)
         }
         val digest = try {
             linkFile.readText()

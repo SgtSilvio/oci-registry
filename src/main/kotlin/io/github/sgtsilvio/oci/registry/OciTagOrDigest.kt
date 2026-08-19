@@ -3,11 +3,11 @@ package io.github.sgtsilvio.oci.registry
 /**
  * @author Silvio Giebl
  */
-internal sealed interface OciReference
+internal sealed interface OciTagOrDigest
 
-internal fun String.toOciReference() = if (':' in this) toOciDigest() else toOciTag()
+internal fun String.toOciTagOrDigest() = if (':' in this) toOciDigest() else toOciTag()
 
-internal class OciTag(val name: String) : OciReference {
+internal class OciTag(val name: String) : OciTagOrDigest {
 
     override fun equals(other: Any?) = when {
         this === other -> true
