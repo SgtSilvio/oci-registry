@@ -24,21 +24,24 @@ private const val DOCKER_CONTENT_DIGEST = "docker-content-digest"
  * |-------------------------------------------------------------|--------|----------------|----------------|--------------------|
  * | `/v2`, `/v2/`                                               | GET    | 200            | end-1          |                    |
  * | `/v2`, `/v2/`                                               | HEAD   | 200            |                |                    |
- * | `/v2/<name>/manifests/<reference>`                          | GET    | 200, 404       | end-3          | pull               |
- * | `/v2/<name>/manifests/<reference>`                          | HEAD   | 200, 404       | end-3          | pull               |
- * | `/v2/<name>/manifests/<reference>`                          | PUT    | 201            | end-7          | push               |
- * | `/v2/<name>/manifests/<reference>`                          | DELETE | 405            | end-9          | content management |
+ * | `/v2/<name>/manifests/<tag-or-digest>`                      | GET    | 200, 404       | end-3          | pull               |
+ * | `/v2/<name>/manifests/<tag-or-digest>`                      | HEAD   | 200, 404       | end-3          | pull               |
+ * | `/v2/<name>/manifests/<tag-or-digest>`                      | PUT    | 201            | end-7a         | push               |
+ * | `/v2/<name>/manifests/<digest>?tag=1&tag=2&tag=3`           | PUT    | 201            | end-7b         | push               | TODO support tag parameters
+ * | `/v2/<name>/manifests/<tag-or-digest>`                      | DELETE | 405            | end-9          | content management |
  * | `/v2/<name>/blobs/<digest>`                                 | GET    | 200, 404       | end-2          | pull               |
  * | `/v2/<name>/blobs/<digest>`                                 | HEAD   | 200, 404       | end-2          | pull               |
  * | `/v2/<name>/blobs/<digest>`                                 | DELETE | 405            | end-10         | content management |
  * | `/v2/<name>/blobs/uploads/`                                 | POST   | 202            | end-4a         | push               |
+ * | `/v2/<name>/blobs/uploads/?digest-algorithm=<algorithm>`    | POST   | 202            | end-4c         | push               | TODO do something with the digest-algorithm parameter?
+ * | `/v2/<name>/blobs/uploads/?mount=<digest>`                  | POST   | 201, 202       | end-11         | push               | TODO support only mount parameter
  * | `/v2/<name>/blobs/uploads/?mount=<digest>&from=<otherName>` | POST   | 201, 202       | end-11         | push               |
  * | `/v2/<name>/blobs/uploads/?digest=<digest>`                 | POST   | 201, 202       | end-4b         | push               |
- * | `/v2/<name>/blobs/uploads/<reference>`                      | GET    | 204, 404       | end-13         | push               |
- * | `/v2/<name>/blobs/uploads/<reference>`                      | HEAD   | 204, 404       |                | push               |
- * | `/v2/<name>/blobs/uploads/<reference>`                      | PATCH  | 202, 404       | end-5          | push               |
- * | `/v2/<name>/blobs/uploads/<reference>`                      | DELETE | 405            |                | push               |
- * | `/v2/<name>/blobs/uploads/<reference>?digest=<digest>`      | PUT    | 201, 404       | end-6          | push               |
+ * | `/v2/<name>/blobs/uploads/<id>`                             | GET    | 204, 404       | end-13         | push               |
+ * | `/v2/<name>/blobs/uploads/<id>`                             | HEAD   | 204, 404       |                | push               |
+ * | `/v2/<name>/blobs/uploads/<id>`                             | PATCH  | 202, 404, 416  | end-5          | push               |
+ * | `/v2/<name>/blobs/uploads/<id>?digest=<digest>`             | PUT    | 201, 404, 416  | end-6          | push               |
+ * | `/v2/<name>/blobs/uploads/<id>`                             | DELETE | 405            | end-14         | push               |
  * | `/v2/<name>/tags/list`                                      | GET    | 405            | end-8a         | content discovery  |
  * | `/v2/<name>/tags/list?n=<integer>[&last=<tagName>]`         | GET    | 405            | end-8b         | content discovery  |
  * | `/v2/<name>/referrers/<digest>`                             | GET    | 404            | end-12a        | content discovery  |
