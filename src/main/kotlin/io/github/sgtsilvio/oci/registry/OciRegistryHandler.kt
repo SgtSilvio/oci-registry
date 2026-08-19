@@ -28,7 +28,7 @@ private const val OCI_TAG = "oci-tag"
  * | `/v2/<name>/manifests/<tag-or-digest>`                      | GET    | 200, 404       | end-3          | pull               |
  * | `/v2/<name>/manifests/<tag-or-digest>`                      | HEAD   | 200, 404       | end-3          | pull               |
  * | `/v2/<name>/manifests/<tag-or-digest>`                      | PUT    | 201            | end-7a         | push               |
- * | `/v2/<name>/manifests/<digest>?tag=1&tag=2&tag=3`           | PUT    | 201            | end-7b         | push               | TODO support tag parameters
+ * | `/v2/<name>/manifests/<digest>?tag=1&tag=2&tag=3`           | PUT    | 201            | end-7b         | push               |
  * | `/v2/<name>/manifests/<tag-or-digest>`                      | DELETE | 405            | end-9          | content management |
  * | `/v2/<name>/blobs/<digest>`                                 | GET    | 200, 404       | end-2          | pull               |
  * | `/v2/<name>/blobs/<digest>`                                 | HEAD   | 200, 404       | end-2          | pull               |
