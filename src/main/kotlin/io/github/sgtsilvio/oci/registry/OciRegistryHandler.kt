@@ -18,6 +18,7 @@ import java.util.function.BiFunction
 import kotlin.io.path.fileSize
 
 private const val DOCKER_CONTENT_DIGEST = "docker-content-digest"
+private const val OCI_TAG = "oci-tag"
 
 /**
  * | resource                                                    | method | response codes | spec reference | category           |
@@ -178,19 +179,36 @@ class OciRegistryHandler(
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
-        if ((tagOrDigest is OciDigest) && tagOrDigest.algorithm.isUnsupported()) {
-            return response.sendBadRequest()
+        val digest: OciDigest?
+        val tags: List<OciTag>
+        when (tagOrDigest) {
+            is OciTag -> {
+                digest = null
+                tags = listOf(tagOrDigest)
+            }
+
+            is OciDigest -> {
+                digest = tagOrDigest
+                if (digest.algorithm.isUnsupported()) {
+                    return response.sendBadRequest()
+                }
+                tags = try {
+                    URI(request.uri()).queryParameters["tag"]?.map { it.toOciTag() } ?: emptyList()
+                } catch (_: IllegalArgumentException) {
+                    return response.sendBadRequest()
+                }
+            }
         }
         val contentType = request.requestHeaders()[CONTENT_TYPE]
         return request.receive().aggregate().asByteArray().flatMap { data ->
-            putManifest(repositoryName, reference as? OciDigest, reference as? OciTag, contentType, data, response)
+            putManifest(repositoryName, digest, tags, contentType, data, response)
         }
     }
 
     private fun putManifest(
         repositoryName: String,
         digest: OciDigest?,
-        tag: OciTag?,
+        tags: List<OciTag>,
         mediaType: String?,
         data: ByteArray,
         response: HttpServerResponse,
@@ -226,11 +244,14 @@ class OciRegistryHandler(
         }
         // TODO validate manifests json structure ignoring additional fields
         storage.putManifest(repositoryName, actualDigest, data)
-        if (tag != null) {
+        for (tag in tags) {
             storage.tagManifest(repositoryName, actualDigest, tag)
         }
-        response.header(LOCATION, "/v2/$repositoryName/manifests/${tag ?: actualDigest}")
+        response.header(LOCATION, "/v2/$repositoryName/manifests/${digest ?: tags.first()}")
         response.header(DOCKER_CONTENT_DIGEST, actualDigest.toString())
+        if (tags.isNotEmpty()) {
+            response.header(OCI_TAG, tags.joinToString(","))
+        }
         return response.status(CREATED).send()
     }
 
@@ -377,12 +398,12 @@ class OciRegistryHandler(
         response: HttpServerResponse,
     ): Publisher<Void> {
         val queryParameters = URI(request.uri()).queryParameters
-        val mountParameter = queryParameters["mount"]
-        val fromParameter = queryParameters["from"]
+        val mountParameter = queryParameters["mount"]?.first()
+        val fromParameter = queryParameters["from"]?.first() // TODO optional, then respond created if exists, else create upload
         if ((mountParameter != null) && (fromParameter != null)) {
             return mountBlob(repositoryName, mountParameter, fromParameter, response)
         }
-        val digestParameter = queryParameters["digest"]
+        val digestParameter = queryParameters["digest"]?.first()
         if (digestParameter != null) {
             return putBlob(repositoryName, digestParameter, request, response)
         }
@@ -499,7 +520,7 @@ class OciRegistryHandler(
         response: HttpServerResponse,
     ): Publisher<Void> {
         val queryParameters = URI(request.uri()).queryParameters
-        val digestParameter = queryParameters["digest"] ?: return response.sendBadRequest()
+        val digestParameter = queryParameters["digest"]?.singleOrNull() ?: return response.sendBadRequest()
         val digest = try {
             digestParameter.toOciDigest()
         } catch (_: IllegalArgumentException) {
@@ -548,13 +569,8 @@ class OciRegistryHandler(
     }
 }
 
-private val URI.queryParameters: Map<String, String> // TODO move to UriExtensions
-    get() {
-        val query = query ?: return emptyMap()
-        return query.split('&').associate {
-            Pair(it.substringBefore('='), it.substringAfter('=', ""))
-        }
-    }
+private val URI.queryParameters: Map<String, List<String>> // TODO move to UriExtensions
+    get() = query?.split('&')?.groupBy({ it.substringBefore('=') }, { it.substringAfter('=', "") }) ?: emptyMap()
 
 private fun String.decodeNonStandardHttpRange(): HttpRange {
     val parts = split('-')
