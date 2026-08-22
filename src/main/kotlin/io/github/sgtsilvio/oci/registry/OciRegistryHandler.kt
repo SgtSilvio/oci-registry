@@ -34,8 +34,8 @@ private const val OCI_TAG = "oci-tag"
  * | `/v2/<name>/blobs/<digest>`                                 | HEAD   | 200, 404       | end-2          | pull               |
  * | `/v2/<name>/blobs/<digest>`                                 | DELETE | 405            | end-10         | content management |
  * | `/v2/<name>/blobs/uploads/`                                 | POST   | 202            | end-4a         | push               |
- * | `/v2/<name>/blobs/uploads/?digest-algorithm=<algorithm>`    | POST   | 202            | end-4c         | push               | TODO do something with the digest-algorithm parameter?
- * | `/v2/<name>/blobs/uploads/?mount=<digest>`                  | POST   | 201, 202       | end-11         | push               | TODO support only mount parameter
+ * | `/v2/<name>/blobs/uploads/?digest-algorithm=<algorithm>`    | POST   | 202            | end-4c         | push               |
+ * | `/v2/<name>/blobs/uploads/?mount=<digest>`                  | POST   | 201, 202       | end-11         | push               |
  * | `/v2/<name>/blobs/uploads/?mount=<digest>&from=<otherName>` | POST   | 201, 202       | end-11         | push               |
  * | `/v2/<name>/blobs/uploads/?digest=<digest>`                 | POST   | 201, 202       | end-4b         | push               |
  * | `/v2/<name>/blobs/uploads/<id>`                             | GET    | 204, 404       | end-13         | push               |
@@ -398,14 +398,16 @@ class OciRegistryHandler(
         response: HttpServerResponse,
     ): Publisher<Void> {
         val queryParameters = URI(request.uri()).queryParameters
-        val mountParameter = queryParameters["mount"]?.first()
-        val fromParameter = queryParameters["from"]?.first() // TODO optional, then respond created if exists, else create upload
-        if ((mountParameter != null) && (fromParameter != null)) {
-            return mountBlob(repositoryName, mountParameter, fromParameter, response)
+        val mountParameter = queryParameters["mount"]
+        if (mountParameter != null) {
+            val rawDigest = mountParameter.singleOrNull() ?: return response.sendBadRequest()
+            val fromParameter = queryParameters["from"]?.first()
+            return mountBlob(repositoryName, rawDigest, fromParameter, response)
         }
-        val digestParameter = queryParameters["digest"]?.first()
+        val digestParameter = queryParameters["digest"]
         if (digestParameter != null) {
-            return putBlob(repositoryName, digestParameter, request, response)
+            val rawDigest = digestParameter.singleOrNull() ?: return response.sendBadRequest()
+            return putBlob(repositoryName, rawDigest, request, response)
         }
         return createBlobUpload(repositoryName, response)
     }
@@ -413,7 +415,7 @@ class OciRegistryHandler(
     private fun mountBlob(
         repositoryName: String,
         rawDigest: String,
-        fromRepositoryName: String,
+        fromRepositoryName: String?,
         response: HttpServerResponse,
     ): Publisher<Void> {
         val digest = try {
@@ -421,7 +423,7 @@ class OciRegistryHandler(
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        return if (storage.mountBlob(repositoryName, digest, fromRepositoryName)) {
+        return if (storage.mountBlob(repositoryName, digest, fromRepositoryName ?: repositoryName)) {
             response.sendBlobCreated(repositoryName, digest)
         } else {
             createBlobUpload(repositoryName, response)
@@ -520,9 +522,9 @@ class OciRegistryHandler(
         response: HttpServerResponse,
     ): Publisher<Void> {
         val queryParameters = URI(request.uri()).queryParameters
-        val digestParameter = queryParameters["digest"]?.singleOrNull() ?: return response.sendBadRequest()
+        val rawDigest = queryParameters["digest"]?.singleOrNull() ?: return response.sendBadRequest()
         val digest = try {
-            digestParameter.toOciDigest()
+            rawDigest.toOciDigest()
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
