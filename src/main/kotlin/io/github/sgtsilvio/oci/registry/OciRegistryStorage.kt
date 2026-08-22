@@ -18,7 +18,7 @@ sealed class OciRegistryStorage {
 
     internal abstract fun getBlob(repositoryName: String, digest: OciDigest): Path? // TODO return Flux<ByteArray> or ByteBufFlux, error if not found?
 
-    internal abstract fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String): Boolean
+    internal abstract fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String?): Boolean
 
     internal abstract fun createBlobUpload(repositoryName: String): String
 

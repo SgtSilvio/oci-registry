@@ -57,13 +57,19 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return blobFile
     }
 
-    override fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String): Boolean {
-        val blobDigest = resolveBlobLinkFile(fromRepositoryName, digest).readOciDigest() ?: return false
+    override fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String?): Boolean {
+        val blobLinkFile = resolveBlobLinkFile(repositoryName, digest)
+        var blobDigest = blobLinkFile.readOciDigest()
+        if ((blobDigest == null) && (fromRepositoryName != null)) {
+            blobDigest = resolveBlobLinkFile(fromRepositoryName, digest).readOciDigest()
+        }
+        if (blobDigest == null) {
+            return false
+        }
         if (!resolveBlobFile(blobDigest).exists()) {
             return false
         }
-        resolveBlobLinkFile(repositoryName, digest).createParentDirectories()
-            .writeAtomicallyIfNotExists { it.writeText(blobDigest.toString()) }
+        blobLinkFile.createParentDirectories().writeAtomicallyIfNotExists { it.writeText(blobDigest.toString()) }
         return true
     }
 

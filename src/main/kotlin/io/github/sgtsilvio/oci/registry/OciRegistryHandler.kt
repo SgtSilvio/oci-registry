@@ -423,7 +423,7 @@ class OciRegistryHandler(
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
-        return if (storage.mountBlob(repositoryName, digest, fromRepositoryName ?: repositoryName)) {
+        return if (storage.mountBlob(repositoryName, digest, fromRepositoryName)) {
             response.sendBlobCreated(repositoryName, digest)
         } else {
             createBlobUpload(repositoryName, response)
