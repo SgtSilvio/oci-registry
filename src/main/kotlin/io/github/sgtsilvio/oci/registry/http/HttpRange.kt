@@ -14,13 +14,13 @@ private fun String.decodeHttpRangeSpec(): HttpRangeSpec {
     }
     val rangePart1 = rangeParts[0].trim()
     val rangePart2 = rangeParts[1].trim()
-    val first = if (rangePart1.isEmpty()) -1 else rangePart1.toLong()
+    val first = if (rangePart1.isEmpty()) -1L else rangePart1.toLong()
     val last: Long
     if (rangePart2.isEmpty()) {
         if (first == -1L) {
             throw IllegalArgumentException("\"$this\" is not a valid HTTP range spec, it must contain at least a start position or a suffix length.")
         }
-        last = -1
+        last = -1L
     } else {
         last = rangePart2.toLong()
         if (last < first) {
@@ -43,17 +43,17 @@ internal fun HttpRangeSpec.createRange(size: Long): HttpRange {
         if (last == 0L) {
             throw IllegalArgumentException("HTTP range spec $this is not satisfiable for resource with size $size, suffix length must not be 0")
         }
-        HttpRange(max(0, size - last), size - 1)
+        HttpRange(max(0L, size - last), size - 1L)
     } else {
         if (first >= size) {
             throw IllegalArgumentException("HTTP range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
         }
-        HttpRange(first, if (last == -1L) size - 1 else min(size - 1, last))
+        HttpRange(first, if (last == -1L) size - 1L else min(size - 1L, last))
     }
 }
 
 internal data class HttpRange(val first: Long, val last: Long) {
-    val size get() = last - first + 1
+    val size get() = last - first + 1L
 }
 
 internal fun HttpRange.contentRangeHeaderValue(size: Long) = "bytes $first-$last/$size"

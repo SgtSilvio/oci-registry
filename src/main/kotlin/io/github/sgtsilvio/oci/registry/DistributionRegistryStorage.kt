@@ -141,12 +141,12 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
                 fileChannel
             }) { fileChannel ->
                 val messageDigest = digest.algorithm.createMessageDigest()
-                if (offset > 0) {
-                    messageDigest.update(fileChannel, 0, offset)
+                if (offset > 0L) {
+                    messageDigest.update(fileChannel, 0L, offset)
                 }
                 fileChannel.write(
                     data.doOnNext { byteBuf -> messageDigest.update(byteBuf.nioBuffer()) },
-                    offset.coerceAtLeast(0),
+                    offset.coerceAtLeast(0L),
                 ).map { position ->
                     if (position < fileChannel.size()) {
                         messageDigest.update(fileChannel, position, Long.MAX_VALUE)
@@ -182,7 +182,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         val buffer = ByteBuffer.allocate(bufferCapacity)
         var position = offset
         var remaining = length
-        while (remaining > 0) {
+        while (remaining > 0L) {
             buffer.position(0)
             buffer.limit(remaining.coerceAtMost(bufferCapacity.toLong()).toInt())
             val read = fileChannel.read(buffer, position)

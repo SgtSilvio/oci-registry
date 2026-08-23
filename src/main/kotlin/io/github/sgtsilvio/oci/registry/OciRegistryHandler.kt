@@ -357,7 +357,7 @@ class OciRegistryHandler(
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, size.toString())
         response.header(DOCKER_CONTENT_DIGEST, digest.toString())
-        return response.sendFile(blobFile, 0, size)
+        return response.sendFile(blobFile, 0L, size)
     }
 
     private fun headBlob(repositoryName: String, digest: OciDigest, response: HttpServerResponse): Publisher<Void> {
@@ -449,7 +449,7 @@ class OciRegistryHandler(
             return response.sendBadRequest()
         }
         val id = storage.createBlobUpload(repositoryName)
-        return storage.finishBlobUpload(repositoryName, id, request.receive(), -1, digest)
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), -1L, digest)
             .materialize()
             .flatMap { result ->
                 when (val error = result.throwable) {
@@ -469,7 +469,7 @@ class OciRegistryHandler(
     private fun getOrHeadBlobUpload(repositoryName: String, id: String, response: HttpServerResponse): Publisher<Void> {
         val size = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
         response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
-        response.header(RANGE, "0-${size - 1}")
+        response.header(RANGE, "0-${size - 1L}")
         return response.status(NO_CONTENT).send()
     }
 
@@ -496,14 +496,14 @@ class OciRegistryHandler(
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
-        return storage.progressBlobUpload(repositoryName, id, request.receive(), contentRange?.first ?: -1)
+        return storage.progressBlobUpload(repositoryName, id, request.receive(), contentRange?.first ?: -1L)
             .materialize()
             .flatMap { result ->
                 when (val error = result.throwable) {
                     null -> {
                         val size = result.get()!!
                         response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
-                        response.header(RANGE, "0-${size - 1}")
+                        response.header(RANGE, "0-${size - 1L}")
                         response.status(ACCEPTED).send()
                     }
 
@@ -547,7 +547,7 @@ class OciRegistryHandler(
         if ((contentType != null) && (contentType != APPLICATION_OCTET_STREAM.toString())) {
             return response.sendBadRequest()
         }
-        return storage.finishBlobUpload(repositoryName, id, request.receive(), contentRange?.first ?: -1, digest)
+        return storage.finishBlobUpload(repositoryName, id, request.receive(), contentRange?.first ?: -1L, digest)
             .materialize()
             .flatMap { result ->
                 when (val error = result.throwable) {
