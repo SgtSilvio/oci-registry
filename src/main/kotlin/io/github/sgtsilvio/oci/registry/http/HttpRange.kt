@@ -1,8 +1,5 @@
 package io.github.sgtsilvio.oci.registry.http
 
-import kotlin.math.max
-import kotlin.math.min
-
 // Specification for range requests: https://www.rfc-editor.org/rfc/rfc9110#name-range-requests
 
 internal fun String.decodeHttpByteRangeSpecs(): List<HttpRangeSpec> {
@@ -51,12 +48,12 @@ internal fun HttpRangeSpec.createRange(size: Long): HttpRange {
         if (last == 0L) {
             throw IllegalArgumentException("HTTP range spec $this is not satisfiable for resource with size $size, suffix length must not be 0")
         }
-        HttpRange(max(0L, size - last), size - 1L)
+        HttpRange(maxOf(0L, size - last), size - 1L)
     } else {
         if (first >= size) {
             throw IllegalArgumentException("HTTP range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
         }
-        HttpRange(first, if (last == -1L) size - 1L else min(size - 1L, last))
+        HttpRange(first, if (last == -1L) size - 1L else minOf(size - 1L, last))
     }
 }
 
