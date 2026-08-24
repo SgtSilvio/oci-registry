@@ -6,9 +6,9 @@ import kotlin.math.min
 // Specification for range requests: https://www.rfc-editor.org/rfc/rfc9110#name-range-requests
 
 internal fun String.decodeHttpByteRangeSpecs(): List<HttpRangeSpec> {
-    val rangeSpecs = split(',').mapNotNull { it.trim().ifBlank { null }?.decodeHttpByteRangeSpec() }
+    val rangeSpecs = split(',').mapNotNull { it.trim().ifEmpty { null }?.decodeHttpByteRangeSpec() }
     if (rangeSpecs.isEmpty()) {
-        throw IllegalArgumentException("\"$this\" is not a valid HTTP range spec set, at least one range spec is required")
+        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec set, at least one range spec is required.")
     }
     return rangeSpecs
 }
@@ -16,23 +16,26 @@ internal fun String.decodeHttpByteRangeSpecs(): List<HttpRangeSpec> {
 private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
     val rangeParts = split('-')
     if (rangeParts.size != 2) {
-        throw IllegalArgumentException("\"$this\" is not a valid HTTP range spec, it must contain exactly 1 '-' character.")
+        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, it must contain exactly 1 '-' character.")
     }
     val (rangePart1, rangePart2) = rangeParts
-    val first = if (rangePart1.isEmpty()) -1L else rangePart1.toLong()
-    val last: Long
-    if (rangePart2.isEmpty()) {
-        if (first == -1L) {
-            throw IllegalArgumentException("\"$this\" is not a valid HTTP range spec, it must contain at least a start position or a suffix length.")
+    return if (rangePart1.isNotEmpty()) {
+        val firstPosition = rangePart1.toLong()
+        if (rangePart2.isNotEmpty()) {
+            val lastPosition = rangePart2.toLong()
+            if (lastPosition < firstPosition) {
+                throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, last position must not be less than first position.")
+            }
+            HttpRangeSpec(firstPosition, lastPosition)
+        } else {
+            HttpRangeSpec(firstPosition, -1L)
         }
-        last = -1L
+    } else if (rangePart2.isNotEmpty()) {
+        val suffixLength = rangePart2.toLong()
+        HttpRangeSpec(-1L, suffixLength)
     } else {
-        last = rangePart2.toLong()
-        if (last < first) {
-            throw IllegalArgumentException("\"$this\" is not a valid HTTP range spec, last position must not be less than first position.")
-        }
+        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, it must contain at least a first position or a suffix length.")
     }
-    return HttpRangeSpec(first, last)
 }
 
 internal data class HttpRangeSpec(val first: Long, val last: Long) {
