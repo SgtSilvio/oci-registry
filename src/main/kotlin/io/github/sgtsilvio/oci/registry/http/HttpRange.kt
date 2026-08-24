@@ -7,6 +7,12 @@ package io.github.sgtsilvio.oci.registry.http
  */
 private val httpListSeparatorRegex = Regex("[ \u0009]*,[ \u0009]*")
 
+/**
+ * Parses an HTTP byte range spec set (part of a `content-range` HTTP header with the `bytes` range unit) according to RFC 9110.
+ * ```
+ * byte-range-spec-set = 1#byte-range-spec
+ * ```
+ */
 internal fun String.decodeHttpByteRangeSpecs(): List<HttpRangeSpec> {
     val rangeSpecs = split(httpListSeparatorRegex).filter { it.isNotEmpty() }.map { it.decodeHttpByteRangeSpec() }
     if (rangeSpecs.isEmpty()) {
@@ -15,6 +21,15 @@ internal fun String.decodeHttpByteRangeSpecs(): List<HttpRangeSpec> {
     return rangeSpecs
 }
 
+/**
+ * Parses an HTTP byte range spec (part of a `content-range` HTTP header with the `bytes` range unit) according to RFC 9110.
+ * ```
+ * byte-range-spec = interval-byte-range-spec | suffix-byte-range-spec
+ * interval-byte-range-spec = first-position "-" [ last-position ]
+ * suffix-byte-range-spec = "-" suffix-length
+ * first-position / last-position / suffix-length = [0-9]*
+ * ```
+ */
 private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
     val rangeParts = split('-')
     if (rangeParts.size != 2) {
