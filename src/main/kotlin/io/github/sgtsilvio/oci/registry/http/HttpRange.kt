@@ -2,8 +2,13 @@ package io.github.sgtsilvio.oci.registry.http
 
 // Specification for range requests: https://www.rfc-editor.org/rfc/rfc9110#name-range-requests
 
+/**
+ * Matches `OWS "," OWS` where `OWS = (space | htab)*` (optional whitespace)
+ */
+private val httpListSeparatorRegex = Regex("[ \u0009]*,[ \u0009]*")
+
 internal fun String.decodeHttpByteRangeSpecs(): List<HttpRangeSpec> {
-    val rangeSpecs = split(',').mapNotNull { it.trim().ifEmpty { null }?.decodeHttpByteRangeSpec() }
+    val rangeSpecs = split(httpListSeparatorRegex).filter { it.isNotEmpty() }.map { it.decodeHttpByteRangeSpec() }
     if (rangeSpecs.isEmpty()) {
         throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec set, at least one range spec is required.")
     }
