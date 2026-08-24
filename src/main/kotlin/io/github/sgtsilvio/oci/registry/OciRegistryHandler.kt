@@ -349,7 +349,7 @@ class OciRegistryHandler(
                 }
                 response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
                 response.header(CONTENT_LENGTH, range.size.toString())
-                response.header(CONTENT_RANGE, range.contentRangeHeaderValue(size))
+                response.header(CONTENT_RANGE, range.encodeHeaderValue(size))
                 response.header(OCI_DIGEST_HEADER_NAME, digest.toString())
                 return response.status(PARTIAL_CONTENT).sendFile(blobFile, range.first, range.size)
             }

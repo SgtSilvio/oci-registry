@@ -165,7 +165,7 @@ class HttpRangeTest {
     }
 
     @Test
-    fun contentRangeHeaderValue() {
-        assertEquals("bytes 11-22/33", HttpRange(11, 22).contentRangeHeaderValue(33))
+    fun encodeHeaderValue() {
+        assertEquals("bytes 11-22/33", HttpRange(11, 22).encodeHeaderValue(33))
     }
 }
