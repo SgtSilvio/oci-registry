@@ -35,19 +35,19 @@ class HttpRangeTest {
 
     @Test
     fun decodeHttpRangeSpecs_singleRangeWithSpaces() {
-        val rangeSpecs = "  3  -  10  ".decodeHttpRangeSpecs()
+        val rangeSpecs = "  ,  3-10  ,  ".decodeHttpRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(3, 10)), rangeSpecs)
     }
 
     @Test
     fun decodeHttpRangeSpecs_singleRangeWithOpenEndAndSpaces() {
-        val rangeSpecs = "  42  -  ".decodeHttpRangeSpecs()
+        val rangeSpecs = "  ,  42-  ,  ".decodeHttpRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(42, -1)), rangeSpecs)
     }
 
     @Test
     fun decodeHttpRangeSpecs_singleSuffixRangeWithSpaces() {
-        val rangeSpecs = "  -  10  ".decodeHttpRangeSpecs()
+        val rangeSpecs = "  ,  -10  ,  ".decodeHttpRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(-1, 10)), rangeSpecs)
     }
 
@@ -59,7 +59,7 @@ class HttpRangeTest {
 
     @Test
     fun decodeHttpRangeSpecs_multipleRangesWithSpaces() {
-        val rangeSpecs = "  3  -  10  ,  42  -  ,  -  42  ".decodeHttpRangeSpecs()
+        val rangeSpecs = "  ,  3-10  ,  42-  ,  ,,  -42  ,  ".decodeHttpRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(3, 10), HttpRangeSpec(42, -1), HttpRangeSpec(-1, 42)), rangeSpecs)
     }
 

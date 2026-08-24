@@ -5,15 +5,20 @@ import kotlin.math.min
 
 // Specification for range requests: https://www.rfc-editor.org/rfc/rfc9110#name-range-requests
 
-internal fun String.decodeHttpRangeSpecs(): List<HttpRangeSpec> = split(',').map { it.decodeHttpRangeSpec() }
+internal fun String.decodeHttpRangeSpecs(): List<HttpRangeSpec> {
+    val rangeSpecs = split(',').mapNotNull { it.trim().ifBlank { null }?.decodeHttpRangeSpec() }
+    if (rangeSpecs.isEmpty()) {
+        throw IllegalArgumentException("\"$this\" is not a valid HTTP range spec set, at least one range spec is required")
+    }
+    return rangeSpecs
+}
 
 private fun String.decodeHttpRangeSpec(): HttpRangeSpec {
     val rangeParts = split('-')
     if (rangeParts.size != 2) {
         throw IllegalArgumentException("\"$this\" is not a valid HTTP range spec, it must contain exactly 1 '-' character.")
     }
-    val rangePart1 = rangeParts[0].trim()
-    val rangePart2 = rangeParts[1].trim()
+    val (rangePart1, rangePart2) = rangeParts
     val first = if (rangePart1.isEmpty()) -1L else rangePart1.toLong()
     val last: Long
     if (rangePart2.isEmpty()) {
