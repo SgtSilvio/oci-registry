@@ -337,7 +337,7 @@ class OciRegistryHandler(
         val rangeHeader = request.requestHeaders()[RANGE]
         if ((rangeHeader != null) && rangeHeader.startsWith("bytes=")) {
             val rangeSpecs = try {
-                rangeHeader.substring("bytes=".length).decodeHttpRangeSpecs()
+                rangeHeader.substring("bytes=".length).decodeHttpByteRangeSpecs()
             } catch (_: IllegalArgumentException) {
                 return response.sendBadRequest()
             }

@@ -10,92 +10,92 @@ import org.junit.jupiter.api.assertThrows
 class HttpRangeTest {
 
     @Test
-    fun decodeHttpRangeSpecs_singleRange() {
-        val rangeSpecs = "3-10".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_singleRange() {
+        val rangeSpecs = "3-10".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(3, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_singleRangeWithFirstEqualToLastPosition() {
-        val rangeSpecs = "10-10".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_singleRangeWithFirstEqualToLastPosition() {
+        val rangeSpecs = "10-10".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(10, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_singleRangeWithOpenEnd() {
-        val rangeSpecs = "42-".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_singleRangeWithOpenEnd() {
+        val rangeSpecs = "42-".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(42, -1)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_singleSuffixRange() {
-        val rangeSpecs = "-10".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_singleSuffixRange() {
+        val rangeSpecs = "-10".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(-1, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_singleRangeWithSpaces() {
-        val rangeSpecs = "  ,  3-10  ,  ".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_singleRangeWithSpaces() {
+        val rangeSpecs = "  ,  3-10  ,  ".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(3, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_singleRangeWithOpenEndAndSpaces() {
-        val rangeSpecs = "  ,  42-  ,  ".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_singleRangeWithOpenEndAndSpaces() {
+        val rangeSpecs = "  ,  42-  ,  ".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(42, -1)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_singleSuffixRangeWithSpaces() {
-        val rangeSpecs = "  ,  -10  ,  ".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_singleSuffixRangeWithSpaces() {
+        val rangeSpecs = "  ,  -10  ,  ".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(-1, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_multipleRanges() {
-        val rangeSpecs = "3-10,42-,-42".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_multipleRanges() {
+        val rangeSpecs = "3-10,42-,-42".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(3, 10), HttpRangeSpec(42, -1), HttpRangeSpec(-1, 42)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_multipleRangesWithSpaces() {
-        val rangeSpecs = "  ,  3-10  ,  42-  ,  ,,  -42  ,  ".decodeHttpRangeSpecs()
+    fun decodeHttpByteRangeSpecs_multipleRangesWithSpaces() {
+        val rangeSpecs = "  ,  3-10  ,  42-  ,  ,,  -42  ,  ".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(3, 10), HttpRangeSpec(42, -1), HttpRangeSpec(-1, 42)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpRangeSpecs_empty_throws() {
-        assertThrows<IllegalArgumentException> { "".decodeHttpRangeSpecs() }
+    fun decodeHttpByteRangeSpecs_empty_throws() {
+        assertThrows<IllegalArgumentException> { "".decodeHttpByteRangeSpecs() }
     }
 
     @Test
-    fun decodeHttpRangeSpecs_onlyHyphen_throws() {
-        assertThrows<IllegalArgumentException> { "-".decodeHttpRangeSpecs() }
+    fun decodeHttpByteRangeSpecs_onlyHyphen_throws() {
+        assertThrows<IllegalArgumentException> { "-".decodeHttpByteRangeSpecs() }
     }
 
     @Test
-    fun decodeHttpRangeSpecs_missingHyphen_throws() {
-        assertThrows<IllegalArgumentException> { "1234".decodeHttpRangeSpecs() }
+    fun decodeHttpByteRangeSpecs_missingHyphen_throws() {
+        assertThrows<IllegalArgumentException> { "1234".decodeHttpByteRangeSpecs() }
     }
 
     @Test
-    fun decodeHttpRangeSpecs_multipleHyphens_throws() {
-        assertThrows<IllegalArgumentException> { "12--34".decodeHttpRangeSpecs() }
+    fun decodeHttpByteRangeSpecs_multipleHyphens_throws() {
+        assertThrows<IllegalArgumentException> { "12--34".decodeHttpByteRangeSpecs() }
     }
 
     @Test
-    fun decodeHttpRangeSpecs_firstPositionNotANumber_throws() {
-        assertThrows<IllegalArgumentException> { "12a-34".decodeHttpRangeSpecs() }
+    fun decodeHttpByteRangeSpecs_firstPositionNotANumber_throws() {
+        assertThrows<IllegalArgumentException> { "12a-34".decodeHttpByteRangeSpecs() }
     }
 
     @Test
-    fun decodeHttpRangeSpecs_lastPositionNotANumber_throws() {
-        assertThrows<IllegalArgumentException> { "12-34b".decodeHttpRangeSpecs() }
+    fun decodeHttpByteRangeSpecs_lastPositionNotANumber_throws() {
+        assertThrows<IllegalArgumentException> { "12-34b".decodeHttpByteRangeSpecs() }
     }
 
     @Test
-    fun decodeHttpRangeSpecs_firstGreaterThanLastPosition_throws() {
-        assertThrows<IllegalArgumentException> { "11-10".decodeHttpRangeSpecs() }
+    fun decodeHttpByteRangeSpecs_firstGreaterThanLastPosition_throws() {
+        assertThrows<IllegalArgumentException> { "11-10".decodeHttpByteRangeSpecs() }
     }
 
     @Test
