@@ -82,3 +82,5 @@ internal data class HttpRange(val first: Long, val last: Long) {
 }
 
 internal fun HttpRange.contentRangeHeaderValue(size: Long) = "bytes $first-$last/$size"
+
+internal fun encodeHttpUnsatisfiedByteRangeHeaderValue(size: Long) = "bytes */$size"
