@@ -17,8 +17,8 @@ import java.security.DigestException
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
 
-private const val DOCKER_CONTENT_DIGEST = "docker-content-digest"
-private const val OCI_TAG = "oci-tag"
+private const val OCI_DIGEST_HEADER_NAME = "docker-content-digest"
+private const val OCI_TAG_HEADER_NAME = "oci-tag"
 
 /**
  * | resource                                                    | method | response codes | spec reference | category           |
@@ -169,7 +169,7 @@ class OciRegistryHandler(
         val (digest, manifestBytes) = storage.getManifest(repositoryName, tagOrDigest) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, JSONObject(manifestBytes.decodeToString()).getString("mediaType"))
         response.header(CONTENT_LENGTH, manifestBytes.size.toString())
-        response.header(DOCKER_CONTENT_DIGEST, digest.toString())
+        response.header(OCI_DIGEST_HEADER_NAME, digest.toString())
         return if (isGet) response.sendByteArray(Mono.just(manifestBytes)) else response.send()
     }
 
@@ -248,9 +248,9 @@ class OciRegistryHandler(
             storage.tagManifest(repositoryName, actualDigest, tag)
         }
         response.header(LOCATION, "/v2/$repositoryName/manifests/${digest ?: tags.first()}")
-        response.header(DOCKER_CONTENT_DIGEST, actualDigest.toString())
+        response.header(OCI_DIGEST_HEADER_NAME, actualDigest.toString())
         if (tags.isNotEmpty()) {
-            response.header(OCI_TAG, tags.joinToString(","))
+            response.header(OCI_TAG_HEADER_NAME, tags.joinToString(","))
         }
         return response.status(CREATED).send()
     }
@@ -350,13 +350,13 @@ class OciRegistryHandler(
                 response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
                 response.header(CONTENT_LENGTH, range.size.toString())
                 response.header(CONTENT_RANGE, range.contentRangeHeaderValue(size))
-                response.header(DOCKER_CONTENT_DIGEST, digest.toString())
+                response.header(OCI_DIGEST_HEADER_NAME, digest.toString())
                 return response.status(PARTIAL_CONTENT).sendFile(blobFile, range.first, range.size)
             }
         }
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, size.toString())
-        response.header(DOCKER_CONTENT_DIGEST, digest.toString())
+        response.header(OCI_DIGEST_HEADER_NAME, digest.toString())
         return response.sendFile(blobFile, 0L, size)
     }
 
@@ -364,7 +364,7 @@ class OciRegistryHandler(
         val blobFile = storage.getBlob(repositoryName, digest) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
-        response.header(DOCKER_CONTENT_DIGEST, digest.toString())
+        response.header(OCI_DIGEST_HEADER_NAME, digest.toString())
         return response.send()
     }
 
@@ -563,7 +563,7 @@ class OciRegistryHandler(
 
     private fun HttpServerResponse.sendBlobCreated(repositoryName: String, digest: OciDigest) =
         status(CREATED).header(LOCATION, "/v2/$repositoryName/blobs/$digest")
-            .header(DOCKER_CONTENT_DIGEST, digest.toString())
+            .header(OCI_DIGEST_HEADER_NAME, digest.toString())
             .send()
 
     private fun deleteBlobUpload(repositoryName: String, id: String, response: HttpServerResponse): Publisher<Void> {
