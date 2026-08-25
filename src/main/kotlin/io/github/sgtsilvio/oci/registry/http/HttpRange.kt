@@ -8,7 +8,7 @@ package io.github.sgtsilvio.oci.registry.http
 private val httpListSeparatorRegex = Regex("[ \u0009]*,[ \u0009]*")
 
 /**
- * Parses an HTTP byte range spec set (part of a `content-range` HTTP header with the `bytes` range unit) according to RFC 9110.
+ * Decodes an HTTP byte range spec set (part of a `content-range` HTTP header with the `bytes` range unit) according to RFC 9110.
  * ```
  * byte-range-spec-set = 1#byte-range-spec
  * ```
@@ -22,7 +22,7 @@ internal fun String.decodeHttpByteRangeSpecs(): List<HttpRangeSpec> {
 }
 
 /**
- * Parses an HTTP byte range spec (part of a `content-range` HTTP header with the `bytes` range unit) according to RFC 9110.
+ * Decodes an HTTP byte range spec (part of a `content-range` HTTP header with the `bytes` range unit) according to RFC 9110.
  * ```
  * byte-range-spec = interval-byte-range-spec | suffix-byte-range-spec
  * interval-byte-range-spec = first-position "-" [ last-position ]
@@ -37,9 +37,9 @@ private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
     }
     val (rangePart1, rangePart2) = rangeParts
     return if (rangePart1.isNotEmpty()) {
-        val firstPosition = rangePart1.toLong()
+        val firstPosition = rangePart1.decodeHttpNumber()
         if (rangePart2.isNotEmpty()) {
-            val lastPosition = rangePart2.toLong()
+            val lastPosition = rangePart2.decodeHttpNumber()
             if (lastPosition < firstPosition) {
                 throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, last position must not be less than first position.")
             }
@@ -48,7 +48,7 @@ private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
             HttpRangeSpec(firstPosition, -1L)
         }
     } else if (rangePart2.isNotEmpty()) {
-        val suffixLength = rangePart2.toLong()
+        val suffixLength = rangePart2.decodeHttpNumber()
         HttpRangeSpec(-1L, suffixLength)
     } else {
         throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, it must contain at least a first position or a suffix length.")
@@ -84,3 +84,13 @@ internal data class HttpRange(val first: Long, val last: Long) {
 internal fun HttpRange.encodeHeaderValue(size: Long) = "bytes $first-$last/$size"
 
 internal fun encodeHttpUnsatisfiedByteRangeHeaderValue(size: Long) = "bytes */$size"
+
+/**
+ * Decodes `[0-9]+` into a `Long`, no `+` or `-` signs allowed.
+ */
+private fun String.decodeHttpNumber(): Long {
+    if (!all { it in '0'..'9' }) {
+        throw IllegalArgumentException("\"$this\" is not a valid number")
+    }
+    return toLong()
+}
