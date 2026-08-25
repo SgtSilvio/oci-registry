@@ -40,9 +40,6 @@ private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
         val firstPosition = rangePart1.decodeHttpNumber()
         if (rangePart2.isNotEmpty()) {
             val lastPosition = rangePart2.decodeHttpNumber()
-            if (lastPosition < firstPosition) {
-                throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, last position must not be less than first position.")
-            }
             HttpRangeSpec(firstPosition, lastPosition)
         } else {
             HttpRangeSpec(firstPosition, -1L)
@@ -66,12 +63,15 @@ internal data class HttpRangeSpec(val first: Long, val last: Long) {
 internal fun HttpRangeSpec.createRange(size: Long): HttpRange {
     return if (first == -1L) {
         if (last == 0L) {
-            throw IllegalArgumentException("HTTP range spec $this is not satisfiable for resource with size $size, suffix length must not be 0")
+            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, suffix length must not be 0")
         }
         HttpRange(maxOf(0L, size - last), size - 1L)
     } else {
+        if ((last != -1L) && (last < first)) {
+            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, last position must not be less than first position.")
+        }
         if (first >= size) {
-            throw IllegalArgumentException("HTTP range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
+            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
         }
         HttpRange(first, if (last == -1L) size - 1L else minOf(size - 1L, last))
     }

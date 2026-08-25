@@ -22,6 +22,12 @@ class HttpRangeTest {
     }
 
     @Test
+    fun decodeHttpByteRangeSpecs_singleRangeWithFirstGreaterThanLastPosition() {
+        val rangeSpecs = "11-10".decodeHttpByteRangeSpecs()
+        assertEquals(listOf(HttpRangeSpec(11, 10)), rangeSpecs)
+    }
+
+    @Test
     fun decodeHttpByteRangeSpecs_singleRangeWithOpenEnd() {
         val rangeSpecs = "42-".decodeHttpByteRangeSpecs()
         assertEquals(listOf(HttpRangeSpec(42, -1)), rangeSpecs)
@@ -94,11 +100,6 @@ class HttpRangeTest {
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_firstGreaterThanLastPosition_throws() {
-        assertThrows<IllegalArgumentException> { "11-10".decodeHttpByteRangeSpecs() }
-    }
-
-    @Test
     fun rangeSpecToString() {
         assertEquals("12-34", HttpRangeSpec(12, 34).toString())
     }
@@ -147,6 +148,11 @@ class HttpRangeTest {
     fun createRange_fromSuffixRangeWithSuffixLengthGreaterThanSize() {
         val range = HttpRangeSpec(-1, 33).createRange(22)
         assertEquals(HttpRange(0, 21), range)
+    }
+
+    @Test
+    fun createRange_firstGreaterThanLastPosition() {
+        assertThrows<IllegalArgumentException> { HttpRangeSpec(11, 10).createRange(22) }
     }
 
     @Test
