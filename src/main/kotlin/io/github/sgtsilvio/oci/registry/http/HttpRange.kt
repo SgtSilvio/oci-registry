@@ -38,12 +38,8 @@ private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
     val (rangePart1, rangePart2) = rangeParts
     return if (rangePart1.isNotEmpty()) {
         val firstPosition = rangePart1.decodeHttpNumber()
-        if (rangePart2.isNotEmpty()) {
-            val lastPosition = rangePart2.decodeHttpNumber()
-            HttpIntervalRangeSpec(firstPosition, lastPosition)
-        } else {
-            HttpIntervalRangeSpec(firstPosition, -1L)
-        }
+        val lastPosition = if (rangePart2.isNotEmpty()) rangePart2.decodeHttpNumber() else -1L
+        HttpIntervalRangeSpec(firstPosition, lastPosition)
     } else if (rangePart2.isNotEmpty()) {
         val suffixLength = rangePart2.decodeHttpNumber()
         HttpSuffixRangeSpec(suffixLength)
@@ -70,7 +66,7 @@ internal class HttpIntervalRangeSpec(val first: Long, val last: Long) : HttpRang
         if (first >= size) {
             throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
         }
-        return HttpRange(first, if (last == -1L) size - 1L else minOf(size - 1L, last))
+        return HttpRange(first, if (last == -1L) size - 1L else last.coerceAtMost(size - 1L))
     }
 
     override fun equals(other: Any?) =
@@ -91,7 +87,7 @@ internal class HttpSuffixRangeSpec(val suffixLength: Long) : HttpRangeSpec {
         if (suffixLength == 0L) {
             throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, suffix length must not be 0")
         }
-        return HttpRange(maxOf(0L, size - suffixLength), size - 1L)
+        return HttpRange((size - suffixLength).coerceAtLeast(0L), size - 1L)
     }
 
     override fun equals(other: Any?) =
