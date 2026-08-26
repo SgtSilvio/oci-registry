@@ -52,7 +52,13 @@ private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
     }
 }
 
-internal data class HttpRangeSpec(val first: Long, val last: Long) {
+internal class HttpRangeSpec(val first: Long, val last: Long) {
+
+    override fun equals(other: Any?) =
+        (this === other) || ((other is HttpRangeSpec) && (first == other.first) && (last == other.last))
+
+    override fun hashCode() = first.hashCode() * 31 + last.hashCode()
+
     override fun toString() = buildString {
         if (first != -1L) append(first)
         append('-')
@@ -77,8 +83,13 @@ internal fun HttpRangeSpec.createRange(size: Long): HttpRange {
     }
 }
 
-internal data class HttpRange(val first: Long, val last: Long) {
+internal class HttpRange(val first: Long, val last: Long) {
     val size get() = last - first + 1L
+
+    override fun equals(other: Any?) =
+        (this === other) || ((other is HttpRange) && (first == other.first) && (last == other.last))
+
+    override fun hashCode() = first.hashCode() * 31 + last.hashCode()
 }
 
 internal fun HttpRange.encodeHeaderValue(size: Long) = "bytes $first-$last/$size"
