@@ -10,63 +10,69 @@ import org.junit.jupiter.api.assertThrows
 class HttpRangeTest {
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleRange() {
+    fun decodeHttpByteRangeSpecs_singleIntervalRangeSpec() {
         val rangeSpecs = "3-10".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(3, 10)), rangeSpecs)
+        assertEquals(listOf(HttpIntervalRangeSpec(3, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleRangeWithFirstEqualToLastPosition() {
+    fun decodeHttpByteRangeSpecs_singleIntervalRangeSpecWithFirstEqualToLastPosition() {
         val rangeSpecs = "10-10".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(10, 10)), rangeSpecs)
+        assertEquals(listOf(HttpIntervalRangeSpec(10, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleRangeWithFirstGreaterThanLastPosition() {
+    fun decodeHttpByteRangeSpecs_singleIntervalRangeSpecWithFirstGreaterThanLastPosition() {
         val rangeSpecs = "11-10".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(11, 10)), rangeSpecs)
+        assertEquals(listOf(HttpIntervalRangeSpec(11, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleRangeWithOpenEnd() {
+    fun decodeHttpByteRangeSpecs_singleUnboundedIntervalRangeSpec() {
         val rangeSpecs = "42-".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(42, -1)), rangeSpecs)
+        assertEquals(listOf(HttpIntervalRangeSpec(42, -1)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleSuffixRange() {
+    fun decodeHttpByteRangeSpecs_singleSuffixRangeSpec() {
         val rangeSpecs = "-10".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(-1, 10)), rangeSpecs)
+        assertEquals(listOf(HttpSuffixRangeSpec(10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleRangeWithSpaces() {
+    fun decodeHttpByteRangeSpecs_singleIntervalRangeSpecWithSpaces() {
         val rangeSpecs = "  ,  3-10  ,  ".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(3, 10)), rangeSpecs)
+        assertEquals(listOf(HttpIntervalRangeSpec(3, 10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleRangeWithOpenEndAndSpaces() {
+    fun decodeHttpByteRangeSpecs_singleUnboundedIntervalSpecRangeAndSpaces() {
         val rangeSpecs = "  ,  42-  ,  ".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(42, -1)), rangeSpecs)
+        assertEquals(listOf(HttpIntervalRangeSpec(42, -1)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_singleSuffixRangeWithSpaces() {
+    fun decodeHttpByteRangeSpecs_singleSuffixRangeSpecWithSpaces() {
         val rangeSpecs = "  ,  -10  ,  ".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(-1, 10)), rangeSpecs)
+        assertEquals(listOf(HttpSuffixRangeSpec(10)), rangeSpecs)
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_multipleRanges() {
+    fun decodeHttpByteRangeSpecs_multipleRangeSpecs() {
         val rangeSpecs = "3-10,42-,-42".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(3, 10), HttpRangeSpec(42, -1), HttpRangeSpec(-1, 42)), rangeSpecs)
+        assertEquals(
+            listOf(HttpIntervalRangeSpec(3, 10), HttpIntervalRangeSpec(42, -1), HttpSuffixRangeSpec(42)),
+            rangeSpecs,
+        )
     }
 
     @Test
-    fun decodeHttpByteRangeSpecs_multipleRangesWithSpaces() {
+    fun decodeHttpByteRangeSpecs_multipleRangeSpecsWithSpaces() {
         val rangeSpecs = "  ,  3-10  ,  42-  ,  ,,  -42  ,  ".decodeHttpByteRangeSpecs()
-        assertEquals(listOf(HttpRangeSpec(3, 10), HttpRangeSpec(42, -1), HttpRangeSpec(-1, 42)), rangeSpecs)
+        assertEquals(
+            listOf(HttpIntervalRangeSpec(3, 10), HttpIntervalRangeSpec(42, -1), HttpSuffixRangeSpec(42)),
+            rangeSpecs,
+        )
     }
 
     @Test
@@ -100,78 +106,83 @@ class HttpRangeTest {
     }
 
     @Test
-    fun rangeSpecToString() {
-        assertEquals("12-34", HttpRangeSpec(12, 34).toString())
+    fun intervalRangeSpec_toString() {
+        assertEquals("12-34", HttpIntervalRangeSpec(12, 34).toString())
     }
 
     @Test
-    fun rangeSpecToString_rangeWithOpenEnd() {
-        assertEquals("12-", HttpRangeSpec(12, -1).toString())
+    fun unboundedIntervalRangeSpec_toString() {
+        assertEquals("12-", HttpIntervalRangeSpec(12, -1).toString())
     }
 
     @Test
-    fun rangeSpecToString_suffixRange() {
-        assertEquals("-34", HttpRangeSpec(-1, 34).toString())
+    fun suffixRangeSpec_toString() {
+        assertEquals("-34", HttpSuffixRangeSpec(34).toString())
     }
 
     @Test
-    fun createRange() {
-        val range = HttpRangeSpec(11, 22).createRange(33)
-        assertEquals(HttpRange(11, 22), range)
+    fun intervalRangeSpec_createRange() {
+        val range = HttpIntervalRangeSpec(11, 22).createRange(33)
+        assertEquals(HttpRange(11, 22, 33), range)
     }
 
     @Test
-    fun createRange_lastPositionEqualToSize() {
-        val range = HttpRangeSpec(11, 22).createRange(22)
-        assertEquals(HttpRange(11, 21), range)
+    fun intervalRangeSpecWithLastPositionEqualToSize_createRange() {
+        val range = HttpIntervalRangeSpec(11, 22).createRange(22)
+        assertEquals(HttpRange(11, 21, 22), range)
     }
 
     @Test
-    fun createRange_lastPositionGreaterThanSize() {
-        val range = HttpRangeSpec(11, 33).createRange(22)
-        assertEquals(HttpRange(11, 21), range)
+    fun intervalRangeSpecWithLastPositionGreaterThanSize_createRange() {
+        val range = HttpIntervalRangeSpec(11, 33).createRange(22)
+        assertEquals(HttpRange(11, 21, 22), range)
     }
 
     @Test
-    fun createRange_fromRangeWithOpenEnd() {
-        val range = HttpRangeSpec(11, -1).createRange(33)
-        assertEquals(HttpRange(11, 32), range)
+    fun unboundedIntervalRangeSpec_createRange() {
+        val range = HttpIntervalRangeSpec(11, -1).createRange(33)
+        assertEquals(HttpRange(11, 32, 33), range)
     }
 
     @Test
-    fun createRange_fromSuffixRange() {
-        val range = HttpRangeSpec(-1, 22).createRange(33)
-        assertEquals(HttpRange(11, 32), range)
+    fun suffixRangeSpec_createRange() {
+        val range = HttpSuffixRangeSpec(22).createRange(33)
+        assertEquals(HttpRange(11, 32, 33), range)
     }
 
     @Test
-    fun createRange_fromSuffixRangeWithSuffixLengthGreaterThanSize() {
-        val range = HttpRangeSpec(-1, 33).createRange(22)
-        assertEquals(HttpRange(0, 21), range)
+    fun suffixRangeSpecWithSuffixLengthGreaterThanSize_createRange() {
+        val range = HttpSuffixRangeSpec(33).createRange(22)
+        assertEquals(HttpRange(0, 21, 22), range)
     }
 
     @Test
-    fun createRange_firstGreaterThanLastPosition() {
-        assertThrows<IllegalArgumentException> { HttpRangeSpec(11, 10).createRange(22) }
+    fun intervalRangeSpecWithFirstGreaterThanLastPosition_createRange_throws() {
+        assertThrows<IllegalArgumentException> { HttpIntervalRangeSpec(11, 10).createRange(22) }
     }
 
     @Test
-    fun createRange_firstPositionsEqualToSize_throws() {
-        assertThrows<IllegalArgumentException> { HttpRangeSpec(11, 33).createRange(11) }
+    fun intervalRangeSpecWithFirstPositionsEqualToSize_createRange_throws() {
+        assertThrows<IllegalArgumentException> { HttpIntervalRangeSpec(11, 33).createRange(11) }
     }
 
     @Test
-    fun createRange_firstPositionsGreaterThanSize_throws() {
-        assertThrows<IllegalArgumentException> { HttpRangeSpec(22, 33).createRange(11) }
+    fun intervalRangeSpecWithFirstPositionsGreaterThanSize_createRange_throws() {
+        assertThrows<IllegalArgumentException> { HttpIntervalRangeSpec(22, 33).createRange(11) }
     }
 
     @Test
-    fun createRange_fromSuffixRangeWithSuffixLength0_throws() {
-        assertThrows<IllegalArgumentException> { HttpRangeSpec(-1, 0).createRange(11) }
+    fun unboundedIntervalRangeSpecWithFirstPositionsGreaterThanSize_createRange_throws() {
+        assertThrows<IllegalArgumentException> { HttpIntervalRangeSpec(22, -1).createRange(11) }
     }
 
     @Test
-    fun encodeHeaderValue() {
-        assertEquals("bytes 11-22/33", HttpRange(11, 22).encodeHeaderValue(33))
+    fun suffixRangeWithSuffixLength0_createRange_throws() {
+        assertThrows<IllegalArgumentException> { HttpIntervalRangeSpec(-1, 0).createRange(11) }
+    }
+
+    @Test
+    fun httpRange_toString() {
+        assertEquals("bytes 11-22/33", HttpRange(11, 22, 33).toString())
     }
 }
