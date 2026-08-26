@@ -66,7 +66,7 @@ internal class HttpIntervalRangeSpec(val first: Long, val last: Long) : HttpRang
         if (first >= size) {
             throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
         }
-        return HttpRange(first, if (last == -1L) size - 1L else last.coerceAtMost(size - 1L))
+        return HttpRange(first, if (last == -1L) size - 1L else last.coerceAtMost(size - 1L), size)
     }
 
     override fun equals(other: Any?) =
@@ -87,7 +87,7 @@ internal class HttpSuffixRangeSpec(val suffixLength: Long) : HttpRangeSpec {
         if (suffixLength == 0L) {
             throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, suffix length must not be 0")
         }
-        return HttpRange((size - suffixLength).coerceAtLeast(0L), size - 1L)
+        return HttpRange((size - suffixLength).coerceAtLeast(0L), size - 1L, size)
     }
 
     override fun equals(other: Any?) =
@@ -98,23 +98,30 @@ internal class HttpSuffixRangeSpec(val suffixLength: Long) : HttpRangeSpec {
     override fun toString() = "-$suffixLength"
 }
 
-internal class HttpRange(val first: Long, val last: Long) {
+internal class HttpRange(val first: Long, val last: Long, val completeSize: Long) {
+
+    init {
+        require(first >= 0L)
+        require(first <= last)
+        require(last < completeSize)
+    }
+
     val size get() = last - first + 1L
 
     override fun equals(other: Any?) =
         (this === other) || ((other is HttpRange) && (first == other.first) && (last == other.last))
 
     override fun hashCode() = first.hashCode() * 31 + last.hashCode()
-}
 
-internal fun HttpRange.encodeHeaderValue(size: Long) = "bytes $first-$last/$size"
+    override fun toString() = "bytes $first-$last/$completeSize"
+}
 
 internal fun encodeHttpUnsatisfiedByteRangeHeaderValue(size: Long) = "bytes */$size"
 
 /**
  * Decodes `[0-9]+` into a `Long`, no `+` or `-` signs allowed.
  */
-private fun String.decodeHttpNumber(): Long {
+internal fun String.decodeHttpNumber(): Long {
     if (!all { it in '0'..'9' }) {
         throw IllegalArgumentException("\"$this\" is not a valid number")
     }

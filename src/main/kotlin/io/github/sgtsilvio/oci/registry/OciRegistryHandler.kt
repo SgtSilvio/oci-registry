@@ -1,6 +1,9 @@
 package io.github.sgtsilvio.oci.registry
 
-import io.github.sgtsilvio.oci.registry.http.*
+import io.github.sgtsilvio.oci.registry.http.decodeHttpByteRangeSpecs
+import io.github.sgtsilvio.oci.registry.http.decodeHttpNumber
+import io.github.sgtsilvio.oci.registry.http.sendBadRequest
+import io.github.sgtsilvio.oci.registry.http.sendRangeNotSatisfiable
 import io.netty.handler.codec.http.HttpHeaderNames.*
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
@@ -349,7 +352,7 @@ class OciRegistryHandler(
                 }
                 response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
                 response.header(CONTENT_LENGTH, range.size.toString())
-                response.header(CONTENT_RANGE, range.encodeHeaderValue(size))
+                response.header(CONTENT_RANGE, range.toString())
                 response.header(OCI_DIGEST_HEADER_NAME, digest.toString())
                 return response.status(PARTIAL_CONTENT).sendFile(blobFile, range.first, range.size)
             }
@@ -482,7 +485,7 @@ class OciRegistryHandler(
         val requestHeaders = request.requestHeaders()
         val contentRange = try {
             // content-range header is required in spec, but docker sends PATCH without range
-            requestHeaders[CONTENT_RANGE]?.decodeNonStandardHttpRange()
+            requestHeaders[CONTENT_RANGE]?.decodeBlobUploadRange()
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
@@ -533,7 +536,7 @@ class OciRegistryHandler(
         }
         val requestHeaders = request.requestHeaders()
         val contentRange = try {
-            requestHeaders[CONTENT_RANGE]?.decodeNonStandardHttpRange()
+            requestHeaders[CONTENT_RANGE]?.decodeBlobUploadRange()
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
@@ -574,15 +577,19 @@ class OciRegistryHandler(
 private val URI.queryParameters: Map<String, List<String>> // TODO move to UriExtensions
     get() = query?.split('&')?.groupBy({ it.substringBefore('=') }, { it.substringAfter('=', "") }) ?: emptyMap()
 
-private fun String.decodeNonStandardHttpRange(): HttpRange {
+private class BlobUploadRange(val first: Long, val last: Long) {
+    val size get() = last - first + 1L
+}
+
+private fun String.decodeBlobUploadRange(): BlobUploadRange {
     val parts = split('-')
     if (parts.size != 2) {
         throw IllegalArgumentException("\"$this\" is not a valid range, it must contain exactly 1 '-' character.")
     }
-    val first = parts[0].toLong()
-    val last = parts[1].toLong()
+    val first = parts[0].decodeHttpNumber()
+    val last = parts[1].decodeHttpNumber()
     if (last < first) {
         throw IllegalArgumentException("\"$this\" is not a valid range, last position must not be less than first position.")
     }
-    return HttpRange(first, last)
+    return BlobUploadRange(first, last)
 }
