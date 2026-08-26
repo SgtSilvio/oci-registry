@@ -40,47 +40,66 @@ private fun String.decodeHttpByteRangeSpec(): HttpRangeSpec {
         val firstPosition = rangePart1.decodeHttpNumber()
         if (rangePart2.isNotEmpty()) {
             val lastPosition = rangePart2.decodeHttpNumber()
-            HttpRangeSpec(firstPosition, lastPosition)
+            HttpIntervalRangeSpec(firstPosition, lastPosition)
         } else {
-            HttpRangeSpec(firstPosition, -1L)
+            HttpIntervalRangeSpec(firstPosition, -1L)
         }
     } else if (rangePart2.isNotEmpty()) {
         val suffixLength = rangePart2.decodeHttpNumber()
-        HttpRangeSpec(-1L, suffixLength)
+        HttpSuffixRangeSpec(suffixLength)
     } else {
         throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, it must contain at least a first position or a suffix length.")
     }
 }
 
-internal class HttpRangeSpec(val first: Long, val last: Long) {
-
-    override fun equals(other: Any?) =
-        (this === other) || ((other is HttpRangeSpec) && (first == other.first) && (last == other.last))
-
-    override fun hashCode() = first.hashCode() * 31 + last.hashCode()
-
-    override fun toString() = buildString {
-        if (first != -1L) append(first)
-        append('-')
-        if (last != -1L) append(last)
-    }
+internal sealed interface HttpRangeSpec {
+    fun createRange(size: Long): HttpRange
 }
 
-internal fun HttpRangeSpec.createRange(size: Long): HttpRange {
-    return if (first == -1L) {
-        if (last == 0L) {
-            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, suffix length must not be 0")
-        }
-        HttpRange(maxOf(0L, size - last), size - 1L)
-    } else {
+internal class HttpIntervalRangeSpec(val first: Long, val last: Long) : HttpRangeSpec {
+
+    init {
+        require(first >= 0L)
+        require(last >= -1L)
+    }
+
+    override fun createRange(size: Long): HttpRange {
         if ((last != -1L) && (last < first)) {
             throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, last position must not be less than first position.")
         }
         if (first >= size) {
             throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
         }
-        HttpRange(first, if (last == -1L) size - 1L else minOf(size - 1L, last))
+        return HttpRange(first, if (last == -1L) size - 1L else minOf(size - 1L, last))
     }
+
+    override fun equals(other: Any?) =
+        (this === other) || ((other is HttpIntervalRangeSpec) && (first == other.first) && (last == other.last))
+
+    override fun hashCode() = first.hashCode() * 31 + last.hashCode()
+
+    override fun toString() = if (last == -1L) "$first-" else "$first-$last"
+}
+
+internal class HttpSuffixRangeSpec(val suffixLength: Long) : HttpRangeSpec {
+
+    init {
+        require(suffixLength >= 0L)
+    }
+
+    override fun createRange(size: Long): HttpRange {
+        if (suffixLength == 0L) {
+            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, suffix length must not be 0")
+        }
+        return HttpRange(maxOf(0L, size - suffixLength), size - 1L)
+    }
+
+    override fun equals(other: Any?) =
+        (this === other) || ((other is HttpSuffixRangeSpec) && (suffixLength == other.suffixLength))
+
+    override fun hashCode() = suffixLength.hashCode()
+
+    override fun toString() = "-$suffixLength"
 }
 
 internal class HttpRange(val first: Long, val last: Long) {
