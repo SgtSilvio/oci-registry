@@ -72,7 +72,7 @@ class OciRegistryHandler(
     private fun handleV2(request: HttpServerRequest, path: String, response: HttpServerResponse): Publisher<Void> {
         when (path) {
             "", "/" -> return when (request.method()) {
-                GET, HEAD -> response.header("Docker-Distribution-API-Version", "registry/2.0").send()
+                GET, HEAD -> response.header("docker-distribution-api-version", "registry/2.0").send()
                 else -> response.status(METHOD_NOT_ALLOWED).send()
             }
 
@@ -404,8 +404,8 @@ class OciRegistryHandler(
         val mountParameter = queryParameters["mount"]
         if (mountParameter != null) {
             val rawDigest = mountParameter.singleOrNull() ?: return response.sendBadRequest()
-            val fromParameter = queryParameters["from"]?.first()
-            return mountBlob(repositoryName, rawDigest, fromParameter, response)
+            val fromRepositoryName = queryParameters["from"]?.first()
+            return mountBlob(repositoryName, rawDigest, fromRepositoryName, response)
         }
         val digestParameter = queryParameters["digest"]
         if (digestParameter != null) {
