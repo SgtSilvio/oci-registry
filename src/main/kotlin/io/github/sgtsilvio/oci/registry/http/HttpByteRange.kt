@@ -109,9 +109,9 @@ internal class HttpByteRange(val first: Long, val last: Long, val completeSize: 
     val size get() = last - first + 1L
 
     override fun equals(other: Any?) =
-        (this === other) || ((other is HttpByteRange) && (first == other.first) && (last == other.last))
+        (this === other) || ((other is HttpByteRange) && (first == other.first) && (last == other.last) && (completeSize == other.completeSize))
 
-    override fun hashCode() = first.hashCode() * 31 + last.hashCode()
+    override fun hashCode() = (first.hashCode() * 31 + last.hashCode()) * 31 + completeSize.hashCode()
 
     override fun toString() = "bytes $first-$last/$completeSize"
 }
