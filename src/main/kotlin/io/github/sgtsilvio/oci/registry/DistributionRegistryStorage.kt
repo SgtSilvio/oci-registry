@@ -20,6 +20,15 @@ import kotlin.io.path.*
  */
 class DistributionRegistryStorage(private val directory: Path) : OciRegistryStorage() {
 
+    override fun getTags(repositoryName: String): List<OciTag>? =
+        resolveManifestTagsDirectory(repositoryName).toFile().list()?.mapNotNull {
+            try {
+                it.toOciTag()
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }?.sorted()
+
     override fun getManifest(repositoryName: String, tagOrDigest: OciTagOrDigest): Pair<OciDigest, ByteArray>? {
         val linkFile = when (tagOrDigest) {
             is OciTag -> resolveManifestTagCurrentLinkFile(repositoryName, tagOrDigest)
@@ -214,8 +223,11 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     private fun resolveManifestLinkFile(repositoryName: String, digest: OciDigest): Path =
         resolveRepositoryDirectory(repositoryName).resolve("_manifests/revisions").resolveLinkFile(digest)
 
+    private fun resolveManifestTagsDirectory(repositoryName: String): Path =
+        resolveRepositoryDirectory(repositoryName).resolve("_manifests/tags")
+
     private fun resolveManifestTagDirectory(repositoryName: String, tag: OciTag): Path =
-        resolveRepositoryDirectory(repositoryName).resolve("_manifests/tags").resolve(tag.name)
+        resolveManifestTagsDirectory(repositoryName).resolve(tag.name)
 
     private fun resolveManifestTagCurrentLinkFile(repositoryName: String, tag: OciTag): Path =
         resolveManifestTagDirectory(repositoryName, tag).resolve("current/link")

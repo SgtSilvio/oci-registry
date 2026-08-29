@@ -1,10 +1,8 @@
 package io.github.sgtsilvio.oci.registry
 
-import io.github.sgtsilvio.oci.registry.http.decodeHttpByteRangeSpecs
-import io.github.sgtsilvio.oci.registry.http.decodeHttpNumber
-import io.github.sgtsilvio.oci.registry.http.sendBadRequest
-import io.github.sgtsilvio.oci.registry.http.sendRangeNotSatisfiable
+import io.github.sgtsilvio.oci.registry.http.*
 import io.netty.handler.codec.http.HttpHeaderNames.*
+import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_JSON
 import io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_OCTET_STREAM
 import io.netty.handler.codec.http.HttpMethod.*
 import io.netty.handler.codec.http.HttpResponseStatus.*
@@ -19,6 +17,7 @@ import java.net.URI
 import java.security.DigestException
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
+import kotlin.math.absoluteValue
 
 private const val OCI_DIGEST_HEADER_NAME = "docker-content-digest"
 private const val OCI_TAG_HEADER_NAME = "oci-tag"
@@ -46,8 +45,10 @@ private const val OCI_TAG_HEADER_NAME = "oci-tag"
  * | `/v2/<name>/blobs/uploads/<id>`                             | PATCH  | 202, 404, 416      | end-5          | push               |
  * | `/v2/<name>/blobs/uploads/<id>?digest=<digest>`             | PUT    | 201, 404, 416      | end-6          | push               |
  * | `/v2/<name>/blobs/uploads/<id>`                             | DELETE | 405                | end-14         | push               |
- * | `/v2/<name>/tags/list`                                      | GET    | 405                | end-8a         | content discovery  |
- * | `/v2/<name>/tags/list?n=<integer>[&last=<tagName>]`         | GET    | 405                | end-8b         | content discovery  |
+ * | `/v2/<name>/tags/list`                                      | GET    | 200,404            | end-8a         | content discovery  |
+ * | `/v2/<name>/tags/list?n=<integer>`                          | GET    | 200,404            | end-8b         | content discovery  |
+ * | `/v2/<name>/tags/list?n=<integer>&last=<tagName>`           | GET    | 200,404            | end-8b         | content discovery  |
+ * | `/v2/<name>/tags/list?last=<tagName>`                       | GET    | 200,404            | end-8b         | content discovery  |
  * | `/v2/<name>/referrers/<digest>`                             | GET    | 404                | end-12a        | content discovery  |
  * | `/v2/<name>/referrers/<digest>?artifactType=<artifactType>` | GET    | 404                | end-12b        | content discovery  |
  * | `/v2/_catalog`                                              | GET    | 405                |                | content discovery  |
@@ -123,24 +124,35 @@ class OciRegistryHandler(
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> = when (request.method()) {
-        GET -> getTags(repositoryName, response)
+        GET -> getTags(repositoryName, request, response)
         else -> response.status(METHOD_NOT_ALLOWED).send()
     }
 
-    private fun getTags(repositoryName: String, response: HttpServerResponse): Publisher<Void> {
-//        status: 200, or 404
-//        response.header(CONTENT_TYPE, APPLICATION_JSON)
-//        body: {
-//          "name": "<name>",
-//          "tags": [
-//            "<tag1>",
-//            "<tag2>",
-//            "<tag3>"
-//          ]
-//        }
-//        If the list is not empty, the tags MUST be in lexical order (i.e. case-insensitive alphanumeric order).
-//        TODO ?n=<integer>&last=<tag name>
-        return response.status(METHOD_NOT_ALLOWED).send()
+    private fun getTags(
+        repositoryName: String,
+        request: HttpServerRequest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
+        val requestUri = URI(request.uri())
+        val queryParameters = requestUri.queryParameters
+        val countParameter = queryParameters["n"]?.let { it.singleOrNull()?.decodeIntWithoutSign() ?: return response.sendBadRequest() } // decodeIntWithoutSign catch IAE->sendBadRequest
+        val lastParameter = queryParameters["last"]?.let { it.singleOrNull()?.toOciTag() ?: return response.sendBadRequest() } // toOciTag() catch IAE->sendBadRequest
+        var tags = storage.getTags(repositoryName) ?: return response.sendNotFound()
+        if (lastParameter != null) {
+//            tags = tags.dropWhile { it <= lastParameter }
+            tags = tags.drop((tags.binarySearch(lastParameter) + 1).absoluteValue)
+        }
+        if ((countParameter != null) && (countParameter < tags.size)) {
+            tags = tags.take(countParameter)
+            response.header("link", """<${requestUri.path}?n=$countParameter&last=${tags.last()}>;rel="next"""")
+        }
+        val responseBody = buildString {
+            append("""{"name":"""").append(repositoryName).append("""","tags":[""")
+            tags.joinTo(this, ",") { "\"$it\"" }
+            append("]}")
+        }.encodeToByteArray()
+        response.header(CONTENT_TYPE, APPLICATION_JSON)
+        return response.sendByteArray(Mono.just(responseBody))
     }
 
     private fun handleManifest(
@@ -586,8 +598,8 @@ private fun String.decodeBlobUploadRange(): BlobUploadRange {
     if (parts.size != 2) {
         throw IllegalArgumentException("\"$this\" is not a valid range, it must contain exactly 1 '-' character.")
     }
-    val first = parts[0].decodeHttpNumber()
-    val last = parts[1].decodeHttpNumber()
+    val first = parts[0].decodeLongWithoutSign()
+    val last = parts[1].decodeLongWithoutSign()
     if (last < first) {
         throw IllegalArgumentException("\"$this\" is not a valid range, last position must not be less than first position.")
     }

@@ -10,6 +10,8 @@ import java.nio.file.Path
  */
 sealed class OciRegistryStorage {
 
+    internal abstract fun getTags(repositoryName: String): List<OciTag>?
+
     internal abstract fun getManifest(repositoryName: String, tagOrDigest: OciTagOrDigest): Pair<OciDigest, ByteArray>?
 
     internal abstract fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray)

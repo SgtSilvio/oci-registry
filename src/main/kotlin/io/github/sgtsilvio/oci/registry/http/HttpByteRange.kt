@@ -37,11 +37,11 @@ private fun String.decodeHttpByteRangeSpec(): HttpByteRangeSpec {
     }
     val (rangePart1, rangePart2) = rangeParts
     return if (rangePart1.isNotEmpty()) {
-        val firstPosition = rangePart1.decodeHttpNumber()
-        val lastPosition = if (rangePart2.isNotEmpty()) rangePart2.decodeHttpNumber() else -1L
+        val firstPosition = rangePart1.decodeLongWithoutSign()
+        val lastPosition = if (rangePart2.isNotEmpty()) rangePart2.decodeLongWithoutSign() else -1L
         HttpIntervalByteRangeSpec(firstPosition, lastPosition)
     } else if (rangePart2.isNotEmpty()) {
-        val suffixLength = rangePart2.decodeHttpNumber()
+        val suffixLength = rangePart2.decodeLongWithoutSign()
         HttpSuffixByteRangeSpec(suffixLength)
     } else {
         throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, it must contain at least a first position or a suffix length.")
@@ -117,13 +117,3 @@ internal class HttpByteRange(val first: Long, val last: Long, val completeSize: 
 }
 
 internal fun encodeHttpUnsatisfiedByteRangeHeaderValue(size: Long) = "bytes */$size"
-
-/**
- * Decodes `[0-9]+` into a `Long`, no `+` or `-` signs allowed.
- */
-internal fun String.decodeHttpNumber(): Long {
-    if (!all { it in '0'..'9' }) {
-        throw IllegalArgumentException("\"$this\" is not a valid number")
-    }
-    return toLong()
-}
