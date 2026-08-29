@@ -45,10 +45,10 @@ private const val OCI_TAG_HEADER_NAME = "oci-tag"
  * | `/v2/<name>/blobs/uploads/<id>`                             | PATCH  | 202, 404, 416      | end-5          | push               |
  * | `/v2/<name>/blobs/uploads/<id>?digest=<digest>`             | PUT    | 201, 404, 416      | end-6          | push               |
  * | `/v2/<name>/blobs/uploads/<id>`                             | DELETE | 405                | end-14         | push               |
- * | `/v2/<name>/tags/list`                                      | GET    | 200,404            | end-8a         | content discovery  |
- * | `/v2/<name>/tags/list?n=<integer>`                          | GET    | 200,404            | end-8b         | content discovery  |
- * | `/v2/<name>/tags/list?n=<integer>&last=<tagName>`           | GET    | 200,404            | end-8b         | content discovery  |
- * | `/v2/<name>/tags/list?last=<tagName>`                       | GET    | 200,404            | end-8b         | content discovery  |
+ * | `/v2/<name>/tags/list`                                      | GET    | 200, 404           | end-8a         | content discovery  |
+ * | `/v2/<name>/tags/list?n=<integer>`                          | GET    | 200, 404           | end-8b         | content discovery  |
+ * | `/v2/<name>/tags/list?n=<integer>&last=<tagName>`           | GET    | 200, 404           | end-8b         | content discovery  |
+ * | `/v2/<name>/tags/list?last=<tagName>`                       | GET    | 200, 404           | end-8b         | content discovery  |
  * | `/v2/<name>/referrers/<digest>`                             | GET    | 404                | end-12a        | content discovery  |
  * | `/v2/<name>/referrers/<digest>?artifactType=<artifactType>` | GET    | 404                | end-12b        | content discovery  |
  * | `/v2/_catalog`                                              | GET    | 405                |                | content discovery  |
