@@ -9,12 +9,7 @@ internal fun String.toOciTagOrDigest() = if (':' in this) toOciDigest() else toO
 
 internal class OciTag(val name: String) : OciTagOrDigest {
 
-    override fun equals(other: Any?) = when {
-        this === other -> true
-        other !is OciTag -> false
-        name != other.name -> false
-        else -> true
-    }
+    override fun equals(other: Any?) = (this === other) || ((other is OciTag) && (name == other.name))
 
     override fun hashCode() = name.hashCode()
 

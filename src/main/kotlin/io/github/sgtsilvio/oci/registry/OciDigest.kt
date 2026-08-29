@@ -13,19 +13,10 @@ internal class OciDigest(val algorithm: OciDigestAlgorithm, val hash: ByteArray)
         algorithm.validateHash(hash)
     }
 
-    override fun equals(other: Any?) = when {
-        this === other -> true
-        other !is OciDigest -> false
-        algorithm != other.algorithm -> false
-        !hash.contentEquals(other.hash) -> false
-        else -> true
-    }
+    override fun equals(other: Any?) =
+        (this === other) || ((other is OciDigest) && (algorithm == other.algorithm) && hash.contentEquals(other.hash))
 
-    override fun hashCode(): Int {
-        var result = algorithm.hashCode()
-        result = 31 * result + hash.contentHashCode()
-        return result
-    }
+    override fun hashCode() = algorithm.hashCode() * 31 + hash.contentHashCode()
 
     override fun toString() = "${algorithm.id}:$encodedHash"
 }
@@ -109,12 +100,8 @@ private class UnsupportedOciDigestAlgorithm(override val id: String) : OciDigest
 
     override fun createMessageDigest() = throw UnsupportedOperationException("unsupported digest algorithm '$id'")
 
-    override fun equals(other: Any?) = when {
-        this === other -> true
-        other !is UnsupportedOciDigestAlgorithm -> false
-        id != other.id -> false
-        else -> true
-    }
+    override fun equals(other: Any?) =
+        (this === other) || ((other is UnsupportedOciDigestAlgorithm) && (id == other.id))
 
     override fun hashCode(): Int = id.hashCode()
 
