@@ -135,16 +135,29 @@ class OciRegistryHandler(
     ): Publisher<Void> {
         val requestUri = URI(request.uri())
         val queryParameters = requestUri.queryParameters
-        val countParameter = queryParameters["n"]?.let { it.singleOrNull()?.decodeIntWithoutSign() ?: return response.sendBadRequest() } // decodeIntWithoutSign catch IAE->sendBadRequest
-        val lastParameter = queryParameters["last"]?.let { it.singleOrNull()?.toOciTag() ?: return response.sendBadRequest() } // toOciTag() catch IAE->sendBadRequest
-        var tags = storage.getTags(repositoryName) ?: return response.sendNotFound()
-        if (lastParameter != null) {
-//            tags = tags.dropWhile { it <= lastParameter }
-            tags = tags.drop((tags.binarySearch(lastParameter) + 1).absoluteValue)
+        val count = queryParameters["n"]?.let {
+            val countParameter = it.singleOrNull() ?: return response.sendBadRequest()
+            try {
+                countParameter.decodeIntWithoutSign()
+            } catch (_: IllegalArgumentException) {
+                return response.sendBadRequest()
+            }
         }
-        if ((countParameter != null) && (countParameter < tags.size)) {
-            tags = tags.take(countParameter)
-            response.header("link", """<${requestUri.path}?n=$countParameter&last=${tags.last()}>;rel="next"""")
+        val lastTag = queryParameters["last"]?.let {
+            val lastParameter = it.singleOrNull() ?: return response.sendBadRequest()
+            try {
+                lastParameter.toOciTag()
+            } catch (_: IllegalArgumentException) {
+                return response.sendBadRequest()
+            }
+        }
+        var tags = storage.getTags(repositoryName) ?: return response.sendNotFound()
+        if (lastTag != null) {
+            tags = tags.drop((tags.binarySearch(lastTag) + 1).absoluteValue)
+        }
+        if ((count != null) && (count < tags.size)) {
+            tags = tags.take(count)
+            response.header("link", """<${requestUri.path}?n=$count&last=${tags.last()}>;rel="next"""")
         }
         val responseBody = buildString {
             append("""{"name":"""").append(repositoryName).append("""","tags":[""")
