@@ -40,7 +40,7 @@ internal interface OciDigestAlgorithm {
 internal enum class StandardOciDigestAlgorithm(
     override val id: String,
     private val hashAlgorithmName: String,
-    private val hashByteLength: Int,
+    private val hashByteSize: Int,
 ) : OciDigestAlgorithm {
     SHA_256("sha256", "SHA-256", 32),
     SHA_512("sha512", "SHA-512", 64);
@@ -50,18 +50,18 @@ internal enum class StandardOciDigestAlgorithm(
     override fun decodeHash(encodedHash: String): ByteArray = Hex.decodeHex(validateEncodedHash(encodedHash))
 
     override fun validateHash(hash: ByteArray): ByteArray {
-        if (hash.size != hashByteLength) {
-            throw IllegalArgumentException("digest hash has wrong length ${hash.size}, $hashAlgorithmName requires $hashByteLength")
+        if (hash.size != hashByteSize) {
+            throw IllegalArgumentException("\"${Hex.encodeHexString(hash)}\" is not a valid OCI $id digest hash: it must have size $hashByteSize.")
         }
         return hash
     }
 
     override fun validateEncodedHash(encodedHash: String): String {
-        if (encodedHash.length != (hashByteLength * 2)) {
-            throw IllegalArgumentException("digest encoded hash '$encodedHash' has wrong length ${encodedHash.length}, $hashAlgorithmName requires ${hashByteLength * 2}")
+        if (encodedHash.length != (hashByteSize * 2)) {
+            throw IllegalArgumentException("\"$encodedHash\" is not a valid OCI $id digest encoded hash: it must have length ${hashByteSize * 2}.")
         }
         if (!encodedHash.all { c -> ((c >= '0') && (c <= '9')) || ((c >= 'a') && (c <= 'f')) }) {
-            throw IllegalArgumentException("digest encoded hash '$encodedHash' does not match [a-f0-9]")
+            throw IllegalArgumentException("\"$encodedHash\" is not a valid OCI $id digest encoded hash: it must match `[a-f0-9]`.")
         }
         return encodedHash
     }
@@ -78,7 +78,7 @@ private class UnsupportedOciDigestAlgorithm(override val id: String) : OciDigest
 
     init {
         if (!OCI_DIGEST_ALGORITHM_REGEX.matches(id)) {
-            throw IllegalArgumentException("digest algorithm '$id' does not match $OCI_DIGEST_ALGORITHM_REGEX")
+            throw IllegalArgumentException("\"$id\" is not a valid OCI digest algorithm: it must match `$OCI_DIGEST_ALGORITHM_REGEX`.")
         }
     }
 
@@ -93,7 +93,7 @@ private class UnsupportedOciDigestAlgorithm(override val id: String) : OciDigest
 
     override fun validateEncodedHash(encodedHash: String): String {
         if (!OCI_DIGEST_ENCODED_HASH_REGEX.matches(encodedHash)) {
-            throw IllegalArgumentException("digest encoded hash '$encodedHash' does not match $OCI_DIGEST_ENCODED_HASH_REGEX")
+            throw IllegalArgumentException("\"$encodedHash\" is not a valid OCI digest encoded hash: it must match `$OCI_DIGEST_ENCODED_HASH_REGEX`.")
         }
         return encodedHash
     }
@@ -113,7 +113,7 @@ internal fun OciDigestAlgorithm.isUnsupported() = this is UnsupportedOciDigestAl
 internal fun String.toOciDigest(): OciDigest {
     val colonIndex = indexOf(':')
     if (colonIndex == -1) {
-        throw IllegalArgumentException("missing ':' in digest '$this'")
+        throw IllegalArgumentException("\"$this\" is not a valid OCI digest: it must contain a ':' character.")
     }
     val algorithm = when (val algorithmId = substring(0, colonIndex)) {
         StandardOciDigestAlgorithm.SHA_256.id -> StandardOciDigestAlgorithm.SHA_256

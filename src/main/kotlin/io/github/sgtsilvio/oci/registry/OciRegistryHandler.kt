@@ -510,7 +510,7 @@ class OciRegistryHandler(
         val requestHeaders = request.requestHeaders()
         val contentRange = try {
             // content-range header is required in spec, but docker sends PATCH without range
-            requestHeaders[CONTENT_RANGE]?.decodeBlobUploadRange()
+            requestHeaders[CONTENT_RANGE]?.decodeOciBlobUploadRange()
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
@@ -561,7 +561,7 @@ class OciRegistryHandler(
         }
         val requestHeaders = request.requestHeaders()
         val contentRange = try {
-            requestHeaders[CONTENT_RANGE]?.decodeBlobUploadRange()
+            requestHeaders[CONTENT_RANGE]?.decodeOciBlobUploadRange()
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
@@ -606,15 +606,15 @@ private class BlobUploadRange(val first: Long, val last: Long) {
     val size get() = last - first + 1L
 }
 
-private fun String.decodeBlobUploadRange(): BlobUploadRange {
+private fun String.decodeOciBlobUploadRange(): BlobUploadRange {
     val parts = split('-')
     if (parts.size != 2) {
-        throw IllegalArgumentException("\"$this\" is not a valid range, it must contain exactly 1 '-' character.")
+        throw IllegalArgumentException("\"$this\" is not a valid OCI blob upload range: it must contain exactly one '-' character.")
     }
     val first = parts[0].decodeLongWithoutSign()
     val last = parts[1].decodeLongWithoutSign()
     if (last < first) {
-        throw IllegalArgumentException("\"$this\" is not a valid range, last position must not be less than first position.")
+        throw IllegalArgumentException("\"$this\" is not a valid OCI blob upload range: last position must not be less than first position.")
     }
     return BlobUploadRange(first, last)
 }

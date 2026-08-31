@@ -16,7 +16,7 @@ private val httpListSeparatorRegex = Regex("[ \u0009]*,[ \u0009]*")
 internal fun String.decodeHttpByteRangeSpecs(): List<HttpByteRangeSpec> {
     val rangeSpecs = split(httpListSeparatorRegex).filter { it.isNotEmpty() }.map { it.decodeHttpByteRangeSpec() }
     if (rangeSpecs.isEmpty()) {
-        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec set, at least one range spec is required.")
+        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec set: at least one range spec is required.")
     }
     return rangeSpecs
 }
@@ -33,7 +33,7 @@ internal fun String.decodeHttpByteRangeSpecs(): List<HttpByteRangeSpec> {
 private fun String.decodeHttpByteRangeSpec(): HttpByteRangeSpec {
     val rangeParts = split('-')
     if (rangeParts.size != 2) {
-        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, it must contain exactly 1 '-' character.")
+        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec: it must contain exactly one '-' character.")
     }
     val (rangePart1, rangePart2) = rangeParts
     return if (rangePart1.isNotEmpty()) {
@@ -44,7 +44,7 @@ private fun String.decodeHttpByteRangeSpec(): HttpByteRangeSpec {
         val suffixLength = rangePart2.decodeLongWithoutSign()
         HttpSuffixByteRangeSpec(suffixLength)
     } else {
-        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec, it must contain at least a first position or a suffix length.")
+        throw IllegalArgumentException("\"$this\" is not a valid HTTP bytes range spec: it must contain at least a first position or a suffix length.")
     }
 }
 
@@ -61,10 +61,10 @@ internal class HttpIntervalByteRangeSpec(val first: Long, val last: Long) : Http
 
     override fun createRange(size: Long): HttpByteRange {
         if ((last != -1L) && (last < first)) {
-            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, last position must not be less than first position.")
+            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable: last position must not be less than first position.")
         }
         if (first >= size) {
-            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable for resource with size $size, first position must be less than $size")
+            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable: first position must be less than resource size $size.")
         }
         return HttpByteRange(first, if (last == -1L) size - 1L else last.coerceAtMost(size - 1L), size)
     }
@@ -85,7 +85,7 @@ internal class HttpSuffixByteRangeSpec(val suffixLength: Long) : HttpByteRangeSp
 
     override fun createRange(size: Long): HttpByteRange {
         if (suffixLength == 0L) {
-            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable, suffix length must not be 0")
+            throw IllegalArgumentException("HTTP byte range spec $this is not satisfiable: suffix length must not be 0.")
         }
         return HttpByteRange((size - suffixLength).coerceAtLeast(0L), size - 1L, size)
     }

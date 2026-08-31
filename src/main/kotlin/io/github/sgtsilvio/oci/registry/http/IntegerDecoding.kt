@@ -15,7 +15,7 @@ internal fun String.decodeIntWithoutSign() = validateUnsignedInteger().toInt()
  */
 private fun String.validateUnsignedInteger(): String {
     if (isEmpty() || !all { it in '0'..'9' }) {
-        throw IllegalArgumentException("\"$this\" does not match [0-9]+")
+        throw IllegalArgumentException("\"$this\" does not match `[0-9]+`.")
     }
     return this
 }
