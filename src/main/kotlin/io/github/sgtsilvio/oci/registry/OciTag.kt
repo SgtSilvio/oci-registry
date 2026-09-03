@@ -7,6 +7,9 @@ internal sealed interface OciTagOrDigest
 
 internal fun String.toOciTagOrDigest() = if (':' in this) toOciDigest() else toOciTag()
 
+/**
+ * @author Silvio Giebl
+ */
 internal class OciTag(val name: String) : OciTagOrDigest, Comparable<OciTag> {
 
     init {
