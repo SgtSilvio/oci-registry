@@ -28,7 +28,7 @@ private fun String.validateOciRepositoryName(): String {
     var i = 0
     while (true) {
         if ((i == length) || !this[i].isOciRepositoryNameAlphanumeric()) {
-            throw IllegalArgumentException("\"$this\" is not a valid OCI repository name: the character at index $i must match `[a-z0-9]`")
+            throw IllegalArgumentException("\"$this\" is not a valid OCI repository name: the character at index $i must match `[a-z0-9]`.")
         }
         do {
             i++
