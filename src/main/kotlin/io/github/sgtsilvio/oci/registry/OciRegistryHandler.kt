@@ -111,11 +111,11 @@ class OciRegistryHandler(
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> = when (request.method()) {
-        GET -> getRepositories(response)
+        GET -> getRepositories(request, response)
         else -> response.status(METHOD_NOT_ALLOWED).send()
     }
 
-    private fun getRepositories(response: HttpServerResponse): Publisher<Void> {
+    private fun getRepositories(request: HttpServerRequest, response: HttpServerResponse): Publisher<Void> {
         return response.status(METHOD_NOT_ALLOWED).send()
     }
 
