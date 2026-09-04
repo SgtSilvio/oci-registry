@@ -10,31 +10,38 @@ import java.nio.file.Path
  */
 sealed class OciRegistryStorage {
 
-    internal abstract fun getTags(repositoryName: String): List<OciTag>?
+    internal abstract fun getTags(repositoryName: OciRepositoryName): List<OciTag>?
 
-    internal abstract fun getManifest(repositoryName: String, tagOrDigest: OciTagOrDigest): Pair<OciDigest, ByteArray>?
+    internal abstract fun getManifest(
+        repositoryName: OciRepositoryName,
+        tagOrDigest: OciTagOrDigest,
+    ): Pair<OciDigest, ByteArray>?
 
-    internal abstract fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray)
+    internal abstract fun putManifest(repositoryName: OciRepositoryName, digest: OciDigest, data: ByteArray)
 
-    internal abstract fun tagManifest(repositoryName: String, digest: OciDigest, tag: OciTag)
+    internal abstract fun tagManifest(repositoryName: OciRepositoryName, digest: OciDigest, tag: OciTag)
 
-    internal abstract fun getBlob(repositoryName: String, digest: OciDigest): Path? // TODO return Flux<ByteArray> or ByteBufFlux, error if not found?
+    internal abstract fun getBlob(repositoryName: OciRepositoryName, digest: OciDigest): Path? // TODO return Flux<ByteArray> or ByteBufFlux, error if not found?
 
-    internal abstract fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String?): Boolean
+    internal abstract fun mountBlob(
+        repositoryName: OciRepositoryName,
+        digest: OciDigest,
+        fromRepositoryName: OciRepositoryName?,
+    ): Boolean
 
-    internal abstract fun createBlobUpload(repositoryName: String): String
+    internal abstract fun createBlobUpload(repositoryName: OciRepositoryName): String
 
-    internal abstract fun getBlobUploadSize(repositoryName: String, id: String): Long?
+    internal abstract fun getBlobUploadSize(repositoryName: OciRepositoryName, id: String): Long?
 
     internal abstract fun progressBlobUpload(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         id: String,
         data: Flux<ByteBuf>,
         offset: Long,
     ): Mono<Long>
 
     internal abstract fun finishBlobUpload(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         id: String,
         data: Flux<ByteBuf>,
         offset: Long,

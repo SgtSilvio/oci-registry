@@ -20,7 +20,7 @@ import kotlin.io.path.*
  */
 class DistributionRegistryStorage(private val directory: Path) : OciRegistryStorage() {
 
-    override fun getTags(repositoryName: String): List<OciTag>? =
+    override fun getTags(repositoryName: OciRepositoryName): List<OciTag>? =
         resolveManifestTagsDirectory(repositoryName).toFile().list()?.mapNotNull {
             try {
                 it.toOciTag()
@@ -29,7 +29,10 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             }
         }?.sorted()
 
-    override fun getManifest(repositoryName: String, tagOrDigest: OciTagOrDigest): Pair<OciDigest, ByteArray>? {
+    override fun getManifest(
+        repositoryName: OciRepositoryName,
+        tagOrDigest: OciTagOrDigest,
+    ): Pair<OciDigest, ByteArray>? {
         val linkFile = when (tagOrDigest) {
             is OciTag -> resolveManifestTagCurrentLinkFile(repositoryName, tagOrDigest)
             is OciDigest -> resolveManifestLinkFile(repositoryName, tagOrDigest)
@@ -44,20 +47,20 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return Pair(digest, bytes)
     }
 
-    override fun putManifest(repositoryName: String, digest: OciDigest, data: ByteArray) {
+    override fun putManifest(repositoryName: OciRepositoryName, digest: OciDigest, data: ByteArray) {
         resolveBlobFile(digest).createParentDirectories().writeAtomicallyIfNotExists { it.writeBytes(data) }
         resolveManifestLinkFile(repositoryName, digest).createParentDirectories()
             .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
     }
 
-    override fun tagManifest(repositoryName: String, digest: OciDigest, tag: OciTag) {
+    override fun tagManifest(repositoryName: OciRepositoryName, digest: OciDigest, tag: OciTag) {
         resolveManifestTagCurrentLinkFile(repositoryName, tag).createParentDirectories()
             .writeAtomically { it.writeText(digest.toString()) }
         resolveManifestTagIndexLinkFile(repositoryName, tag, digest).createParentDirectories()
             .writeAtomicallyIfNotExists { it.writeText(digest.toString()) }
     }
 
-    override fun getBlob(repositoryName: String, digest: OciDigest): Path? {
+    override fun getBlob(repositoryName: OciRepositoryName, digest: OciDigest): Path? {
         val blobDigest = resolveBlobLinkFile(repositoryName, digest).readOciDigest() ?: return null
         val blobFile = resolveBlobFile(blobDigest)
         if (!blobFile.exists()) { // TODO
@@ -66,7 +69,11 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return blobFile
     }
 
-    override fun mountBlob(repositoryName: String, digest: OciDigest, fromRepositoryName: String?): Boolean {
+    override fun mountBlob(
+        repositoryName: OciRepositoryName,
+        digest: OciDigest,
+        fromRepositoryName: OciRepositoryName?,
+    ): Boolean {
         val blobLinkFile = resolveBlobLinkFile(repositoryName, digest)
         var blobDigest = blobLinkFile.readOciDigest()
         if ((blobDigest == null) && (fromRepositoryName != null)) {
@@ -82,13 +89,13 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         return true
     }
 
-    override fun createBlobUpload(repositoryName: String): String {
+    override fun createBlobUpload(repositoryName: OciRepositoryName): String {
         val id = UUID.randomUUID().toString()
         resolveBlobUploadDataFile(repositoryName, id).createParentDirectories().createFile()
         return id
     }
 
-    override fun getBlobUploadSize(repositoryName: String, id: String): Long? {
+    override fun getBlobUploadSize(repositoryName: OciRepositoryName, id: String): Long? {
         return try {
             resolveBlobUploadDataFile(repositoryName, id).fileSize()
         } catch (_: IOException) {
@@ -98,7 +105,11 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
 
     private val blobUploadsInProgress = ConcurrentHashMap<Path, Boolean>()
 
-    private fun <T : Any> lockBlobUpload(repositoryName: String, id: String, block: (Path) -> Mono<T>): Mono<T> {
+    private fun <T : Any> lockBlobUpload(
+        repositoryName: OciRepositoryName,
+        id: String,
+        block: (Path) -> Mono<T>,
+    ): Mono<T> {
         return Mono.using(
             {
                 val blobUploadDataFile = resolveBlobUploadDataFile(repositoryName, id)
@@ -112,7 +123,12 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         )
     }
 
-    override fun progressBlobUpload(repositoryName: String, id: String, data: Flux<ByteBuf>, offset: Long): Mono<Long> {
+    override fun progressBlobUpload(
+        repositoryName: OciRepositoryName,
+        id: String,
+        data: Flux<ByteBuf>,
+        offset: Long,
+    ): Mono<Long> {
         return lockBlobUpload(repositoryName, id) { blobUploadDataFile ->
             Mono.using({
                 val fileChannel = try {
@@ -131,7 +147,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
     }
 
     override fun finishBlobUpload(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         id: String,
         data: Flux<ByteBuf>,
         offset: Long,
@@ -217,25 +233,28 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
             .resolve("data")
     }
 
-    private fun resolveRepositoryDirectory(repositoryName: String): Path =
-        directory.resolve("repositories").resolve(repositoryName)
+    private fun resolveRepositoryDirectory(repositoryName: OciRepositoryName): Path =
+        directory.resolve("repositories").resolve(repositoryName.string)
 
-    private fun resolveManifestLinkFile(repositoryName: String, digest: OciDigest): Path =
+    private fun resolveManifestLinkFile(repositoryName: OciRepositoryName, digest: OciDigest): Path =
         resolveRepositoryDirectory(repositoryName).resolve("_manifests/revisions").resolveLinkFile(digest)
 
-    private fun resolveManifestTagsDirectory(repositoryName: String): Path =
+    private fun resolveManifestTagsDirectory(repositoryName: OciRepositoryName): Path =
         resolveRepositoryDirectory(repositoryName).resolve("_manifests/tags")
 
-    private fun resolveManifestTagDirectory(repositoryName: String, tag: OciTag): Path =
-        resolveManifestTagsDirectory(repositoryName).resolve(tag.name)
+    private fun resolveManifestTagDirectory(repositoryName: OciRepositoryName, tag: OciTag): Path =
+        resolveManifestTagsDirectory(repositoryName).resolve(tag.string)
 
-    private fun resolveManifestTagCurrentLinkFile(repositoryName: String, tag: OciTag): Path =
+    private fun resolveManifestTagCurrentLinkFile(repositoryName: OciRepositoryName, tag: OciTag): Path =
         resolveManifestTagDirectory(repositoryName, tag).resolve("current/link")
 
-    private fun resolveManifestTagIndexLinkFile(repositoryName: String, tag: OciTag, digest: OciDigest): Path =
-        resolveManifestTagDirectory(repositoryName, tag).resolve("index").resolveLinkFile(digest)
+    private fun resolveManifestTagIndexLinkFile(
+        repositoryName: OciRepositoryName,
+        tag: OciTag,
+        digest: OciDigest,
+    ): Path = resolveManifestTagDirectory(repositoryName, tag).resolve("index").resolveLinkFile(digest)
 
-    private fun resolveBlobLinkFile(repositoryName: String, digest: OciDigest): Path =
+    private fun resolveBlobLinkFile(repositoryName: OciRepositoryName, digest: OciDigest): Path =
         resolveRepositoryDirectory(repositoryName).resolve("_layers").resolveLinkFile(digest)
 
     private fun Path.resolveLinkFile(digest: OciDigest): Path =
@@ -249,7 +268,7 @@ class DistributionRegistryStorage(private val directory: Path) : OciRegistryStor
         }.toOciDigest()
     }
 
-    private fun resolveBlobUploadDataFile(repositoryName: String, id: String): Path =
+    private fun resolveBlobUploadDataFile(repositoryName: OciRepositoryName, id: String): Path =
         resolveRepositoryDirectory(repositoryName).resolve("_uploads").resolve(id).resolve("data")
 
     private fun Path.createParentDirectories(): Path { // TODO move to PathExtensions?

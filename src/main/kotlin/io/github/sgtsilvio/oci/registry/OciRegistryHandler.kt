@@ -120,16 +120,23 @@ class OciRegistryHandler(
     }
 
     private fun handleTags(
-        repositoryName: String,
+        rawRepositoryName: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
-    ): Publisher<Void> = when (request.method()) {
-        GET -> getTags(repositoryName, request, response)
-        else -> response.status(METHOD_NOT_ALLOWED).send()
+    ): Publisher<Void> {
+        val repositoryName = try {
+            rawRepositoryName.toOciRepositoryName()
+        } catch (_: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        return when (request.method()) {
+            GET -> getTags(repositoryName, request, response)
+            else -> response.status(METHOD_NOT_ALLOWED).send()
+        }
     }
 
     private fun getTags(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
@@ -169,11 +176,16 @@ class OciRegistryHandler(
     }
 
     private fun handleManifest(
-        repositoryName: String,
+        rawRepositoryName: String,
         rawTagOrDigest: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
+        val repositoryName = try {
+            rawRepositoryName.toOciRepositoryName()
+        } catch (_: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
         val tagOrDigest = try {
             rawTagOrDigest.toOciTagOrDigest()
         } catch (_: IllegalArgumentException) {
@@ -189,7 +201,7 @@ class OciRegistryHandler(
     }
 
     private fun getOrHeadManifest(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         tagOrDigest: OciTagOrDigest,
         isGet: Boolean,
         response: HttpServerResponse,
@@ -202,7 +214,7 @@ class OciRegistryHandler(
     }
 
     private fun putManifest(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         tagOrDigest: OciTagOrDigest,
         request: HttpServerRequest,
         response: HttpServerResponse,
@@ -234,7 +246,7 @@ class OciRegistryHandler(
     }
 
     private fun putManifest(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         digest: OciDigest?,
         tags: List<OciTag>,
         mediaType: String?,
@@ -283,7 +295,7 @@ class OciRegistryHandler(
         return response.status(CREATED).send()
     }
 
-    private fun validateManifest(repositoryName: String, jsonObject: JSONObject): Boolean {
+    private fun validateManifest(repositoryName: OciRepositoryName, jsonObject: JSONObject): Boolean {
         val config = jsonObject.opt("config") as? JSONObject ?: return false
         val rawConfigDigest = config.opt("digest") as? String ?: return false
         val configDigest = try {
@@ -310,7 +322,7 @@ class OciRegistryHandler(
         return true
     }
 
-    private fun validateIndex(repositoryName: String, jsonObject: JSONObject): Boolean {
+    private fun validateIndex(repositoryName: OciRepositoryName, jsonObject: JSONObject): Boolean {
         val manifests = jsonObject.opt("manifests") as? JSONArray ?: return false
         for (manifest in manifests) {
             if (manifest !is JSONObject) return false
@@ -328,7 +340,7 @@ class OciRegistryHandler(
     }
 
     private fun deleteManifest(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         tagOrDigest: OciTagOrDigest,
         response: HttpServerResponse,
     ): Publisher<Void> {
@@ -336,11 +348,16 @@ class OciRegistryHandler(
     }
 
     private fun handleBlob(
-        repositoryName: String,
+        rawRepositoryName: String,
         rawDigest: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
+        val repositoryName = try {
+            rawRepositoryName.toOciRepositoryName()
+        } catch (_: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
         val digest = try {
             rawDigest.toOciDigest()
         } catch (_: IllegalArgumentException) {
@@ -355,7 +372,7 @@ class OciRegistryHandler(
     }
 
     private fun getBlob(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         digest: OciDigest,
         request: HttpServerRequest,
         response: HttpServerResponse,
@@ -388,7 +405,11 @@ class OciRegistryHandler(
         return response.sendFile(blobFile, 0L, size)
     }
 
-    private fun headBlob(repositoryName: String, digest: OciDigest, response: HttpServerResponse): Publisher<Void> {
+    private fun headBlob(
+        repositoryName: OciRepositoryName,
+        digest: OciDigest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
         val blobFile = storage.getBlob(repositoryName, digest) ?: return response.sendNotFound()
         response.header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
         response.header(CONTENT_LENGTH, blobFile.fileSize().toString())
@@ -396,32 +417,43 @@ class OciRegistryHandler(
         return response.send()
     }
 
-    private fun deleteBlob(repositoryName: String, digest: OciDigest, response: HttpServerResponse): Publisher<Void> {
+    private fun deleteBlob(
+        repositoryName: OciRepositoryName,
+        digest: OciDigest,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
         return response.status(METHOD_NOT_ALLOWED).send()
     }
 
     private fun handleBlobUpload(
-        repositoryName: String,
+        rawRepositoryName: String,
         id: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
-    ): Publisher<Void> = when (id) {
-        "" -> when (request.method()) {
-            POST -> postBlobUpload(repositoryName, request, response)
-            else -> response.status(METHOD_NOT_ALLOWED).send()
+    ): Publisher<Void> {
+        val repositoryName = try {
+            rawRepositoryName.toOciRepositoryName()
+        } catch (_: IllegalArgumentException) {
+            return response.sendBadRequest()
         }
+        return when (id) {
+            "" -> when (request.method()) {
+                POST -> postBlobUpload(repositoryName, request, response)
+                else -> response.status(METHOD_NOT_ALLOWED).send()
+            }
 
-        else -> when (request.method()) {
-            GET, HEAD -> getOrHeadBlobUpload(repositoryName, id, response)
-            PATCH -> patchBlobUpload(repositoryName, id, request, response)
-            PUT -> putBlobUpload(repositoryName, id, request, response)
-            DELETE -> deleteBlobUpload(repositoryName, id, response)
-            else -> response.status(METHOD_NOT_ALLOWED).send()
+            else -> when (request.method()) {
+                GET, HEAD -> getOrHeadBlobUpload(repositoryName, id, response)
+                PATCH -> patchBlobUpload(repositoryName, id, request, response)
+                PUT -> putBlobUpload(repositoryName, id, request, response)
+                DELETE -> deleteBlobUpload(repositoryName, id, response)
+                else -> response.status(METHOD_NOT_ALLOWED).send()
+            }
         }
     }
 
     private fun postBlobUpload(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         request: HttpServerRequest,
         response: HttpServerResponse,
     ): Publisher<Void> {
@@ -429,8 +461,8 @@ class OciRegistryHandler(
         val mountParameter = queryParameters["mount"]
         if (mountParameter != null) {
             val rawDigest = mountParameter.singleOrNull() ?: return response.sendBadRequest()
-            val fromRepositoryName = queryParameters["from"]?.first()
-            return mountBlob(repositoryName, rawDigest, fromRepositoryName, response)
+            val rawFromRepositoryName = queryParameters["from"]?.first()
+            return mountBlob(repositoryName, rawDigest, rawFromRepositoryName, response)
         }
         val digestParameter = queryParameters["digest"]
         if (digestParameter != null) {
@@ -441,13 +473,18 @@ class OciRegistryHandler(
     }
 
     private fun mountBlob(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         rawDigest: String,
-        fromRepositoryName: String?,
+        rawFromRepositoryName: String?,
         response: HttpServerResponse,
     ): Publisher<Void> {
         val digest = try {
             rawDigest.toOciDigest()
+        } catch (_: IllegalArgumentException) {
+            return response.sendBadRequest()
+        }
+        val fromRepositoryName = try {
+            rawFromRepositoryName?.toOciRepositoryName()
         } catch (_: IllegalArgumentException) {
             return response.sendBadRequest()
         }
@@ -459,7 +496,7 @@ class OciRegistryHandler(
     }
 
     private fun putBlob(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         rawDigest: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
@@ -488,13 +525,17 @@ class OciRegistryHandler(
             }
     }
 
-    private fun createBlobUpload(repositoryName: String, response: HttpServerResponse): Publisher<Void> {
+    private fun createBlobUpload(repositoryName: OciRepositoryName, response: HttpServerResponse): Publisher<Void> {
         val id = storage.createBlobUpload(repositoryName)
         response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
         return response.status(ACCEPTED).send()
     }
 
-    private fun getOrHeadBlobUpload(repositoryName: String, id: String, response: HttpServerResponse): Publisher<Void> {
+    private fun getOrHeadBlobUpload(
+        repositoryName: OciRepositoryName,
+        id: String,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
         val size = storage.getBlobUploadSize(repositoryName, id) ?: return response.sendNotFound()
         response.header(LOCATION, "/v2/$repositoryName/blobs/uploads/$id")
         response.header(RANGE, "0-${size - 1L}")
@@ -502,7 +543,7 @@ class OciRegistryHandler(
     }
 
     private fun patchBlobUpload(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         id: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
@@ -544,7 +585,7 @@ class OciRegistryHandler(
     }
 
     private fun putBlobUpload(
-        repositoryName: String,
+        repositoryName: OciRepositoryName,
         id: String,
         request: HttpServerRequest,
         response: HttpServerResponse,
@@ -589,12 +630,16 @@ class OciRegistryHandler(
             }
     }
 
-    private fun HttpServerResponse.sendBlobCreated(repositoryName: String, digest: OciDigest) =
+    private fun HttpServerResponse.sendBlobCreated(repositoryName: OciRepositoryName, digest: OciDigest) =
         status(CREATED).header(LOCATION, "/v2/$repositoryName/blobs/$digest")
             .header(OCI_DIGEST_HEADER_NAME, digest.toString())
             .send()
 
-    private fun deleteBlobUpload(repositoryName: String, id: String, response: HttpServerResponse): Publisher<Void> {
+    private fun deleteBlobUpload(
+        repositoryName: OciRepositoryName,
+        id: String,
+        response: HttpServerResponse,
+    ): Publisher<Void> {
         return response.status(METHOD_NOT_ALLOWED).send()
     }
 }

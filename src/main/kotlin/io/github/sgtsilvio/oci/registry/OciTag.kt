@@ -10,19 +10,19 @@ internal fun String.toOciTagOrDigest() = if (':' in this) toOciDigest() else toO
 /**
  * @author Silvio Giebl
  */
-internal class OciTag(val name: String) : OciTagOrDigest, Comparable<OciTag> {
+internal class OciTag(val string: String) : OciTagOrDigest, Comparable<OciTag> {
 
     init {
-        name.validateOciTag()
+        string.validateOciTag()
     }
 
-    override fun compareTo(other: OciTag) = name.compareTo(other.name)
+    override fun compareTo(other: OciTag) = string.compareTo(other.string)
 
-    override fun equals(other: Any?) = (this === other) || ((other is OciTag) && (name == other.name))
+    override fun equals(other: Any?) = (this === other) || ((other is OciTag) && (string == other.string))
 
-    override fun hashCode() = name.hashCode()
+    override fun hashCode() = string.hashCode()
 
-    override fun toString() = name
+    override fun toString() = string
 }
 
 internal fun String.toOciTag() = OciTag(this)
