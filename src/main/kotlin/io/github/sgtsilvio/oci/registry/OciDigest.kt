@@ -1,6 +1,5 @@
 package io.github.sgtsilvio.oci.registry
 
-import org.apache.commons.codec.binary.Hex
 import java.security.MessageDigest
 
 /**
@@ -45,13 +44,13 @@ internal enum class StandardOciDigestAlgorithm(
     SHA_256("sha256", "SHA-256", 32),
     SHA_512("sha512", "SHA-512", 64);
 
-    override fun encodeHash(hash: ByteArray): String = Hex.encodeHexString(validateHash(hash))
+    override fun encodeHash(hash: ByteArray): String = validateHash(hash).toHexString()
 
-    override fun decodeHash(encodedHash: String): ByteArray = Hex.decodeHex(validateEncodedHash(encodedHash))
+    override fun decodeHash(encodedHash: String): ByteArray = validateEncodedHash(encodedHash).hexToByteArray()
 
     override fun validateHash(hash: ByteArray): ByteArray {
         if (hash.size != hashByteSize) {
-            throw IllegalArgumentException("\"${Hex.encodeHexString(hash)}\" is not a valid OCI $id digest hash: it must have size $hashByteSize.")
+            throw IllegalArgumentException("\"${hash.toHexString()}\" is not a valid OCI $id digest hash: it must have size $hashByteSize.")
         }
         return hash
     }
