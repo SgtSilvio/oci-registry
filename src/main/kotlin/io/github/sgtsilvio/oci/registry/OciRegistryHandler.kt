@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono
 import reactor.netty.http.server.HttpServerRequest
 import reactor.netty.http.server.HttpServerResponse
 import java.net.URI
+import java.net.URLDecoder
 import java.security.DigestException
 import java.util.function.BiFunction
 import kotlin.io.path.fileSize
@@ -645,7 +646,11 @@ class OciRegistryHandler(
 }
 
 private val URI.queryParameters: Map<String, List<String>> // TODO move to UriExtensions
-    get() = query?.split('&')?.groupBy({ it.substringBefore('=') }, { it.substringAfter('=', "") }) ?: emptyMap()
+    get() = rawQuery?.split('&')
+        ?.groupBy({ it.substringBefore('=').formUrlDecode() }, { it.substringAfter('=', "").formUrlDecode() })
+        ?: emptyMap()
+
+private fun String.formUrlDecode(): String = URLDecoder.decode(this, "UTF-8")
 
 private class BlobUploadRange(val first: Long, val last: Long) {
     val size get() = last - first + 1L
